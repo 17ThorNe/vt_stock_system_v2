@@ -3,6 +3,7 @@ const userController = require("../controller/user.controller.js");
 async function routes(fastify, option) {
   fastify.get("/users", userController.getUser);
   fastify.post("/create", userController.createUser);
+  fastify.post("/login", userController.login);
   fastify.get("/user/:id", userController.getUserById);
 }
 

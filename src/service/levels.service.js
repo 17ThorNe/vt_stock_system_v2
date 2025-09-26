@@ -1,3 +1,4 @@
+const { data } = require("react-router-dom");
 const db = require("../config/knex.js");
 
 exports.getAllLevels = async () => {
@@ -20,8 +21,7 @@ exports.createLevels = async (dataLevels) => {
       throw error;
     }
   }
-  const result = await db("levels").insert(levelsArray);
-  return result;
+  await db("levels").insert(levelsArray);
 };
 
 exports.getLevelById = async (id) => {
@@ -35,6 +35,27 @@ exports.getLevelById = async (id) => {
     throw error;
   }
   return data;
+};
+
+exports.updateLevel = async (id, dataLevel) => {
+  const existing = await db("levels").where({ id, is_visible: true }).first();
+  if (!existing) {
+    const error = new Error("Level not found or already deleted!");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (dataLevel.name && dataLevel.name !== existing.name) {
+    const nameExists = await db("levels")
+      .where({ name: dataLevel.name })
+      .first();
+    if (nameExists) {
+      const error = new Error(`Level name ${dataLevel.name} already exists!`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+  await db("levels").where({ id }).update(dataLevel);
+  return { status: "success" };
 };
 
 exports.deleteLevelById = async (id) => {

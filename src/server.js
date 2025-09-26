@@ -1,6 +1,7 @@
 const fastify = require("fastify")({ logger: true });
 const knex = require("./config/knex.js");
 const userRoutes = require("./routes/user.route.js");
+require("dotenv").config();
 const levelsRoutes = require("./routes/levels.route.js");
 
 fastify.register(userRoutes, { prefix: "/stock_system/api/v2" });

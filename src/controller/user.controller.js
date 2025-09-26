@@ -1,4 +1,5 @@
 const userService = require("../service/user.service.js");
+const { handleController } = require("../utils/dbHelper.js");
 
 exports.getUser = async (request, reply) => {
   try {
@@ -27,6 +28,15 @@ exports.createUser = async (request, reply) => {
     await userService.createUser(user);
     reply.code(201).send({ message: "success" });
   } catch (error) {
-    reply.code(500).send({ error: "Database error" });
+    const status = error.statusCode || 500;
+    reply.code(status).send({ error: error.message });
   }
+};
+
+exports.login = async (request, reply) => {
+  const { email, password } = request.body;
+  await handleController(request, reply, userService.loginService, [
+    email,
+    password,
+  ]);
 };
