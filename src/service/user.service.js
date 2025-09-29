@@ -1,13 +1,14 @@
 const db = require("../config/knex.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const SECRET_KEY = process.env.JWT_SECRET || "mysecretkey";
+require("dotenv").config();
+const SECRET_KEY = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
 
 exports.getAllUsers = async () => {
   const result = await db("users").select("*");
   if (result.length === 0) {
-    const error = new Error("Data is emtry");
+    const error = new Error("Data is empty");
     error.statusCode = 200;
     throw error;
   }
@@ -15,13 +16,17 @@ exports.getAllUsers = async () => {
 };
 
 exports.getUserByIdService = async (id) => {
-  const result = await db("users").where({ id }).first();
-  if (!result) {
+  const user = await db("users").where({ id }).first();
+  if (!user) {
     const error = new Error("User ID not found!");
     error.statusCode = 404;
     throw error;
   }
-  return result;
+  const staff = await db("staff")
+    .where({ user_id: id })
+    .select("id", "fullname", "email", "position", "permission_lvl", "status");
+  user.staff = staff || [];
+  return user;
 };
 
 exports.createUser = async (user) => {
@@ -29,9 +34,7 @@ exports.createUser = async (user) => {
     !user.fullname ||
     !user.email ||
     !user.password ||
-    !user.confirmPassword ||
-    !user.level_id ||
-    !user.status
+    !user.confirmPassword
   ) {
     const error = new Error("All fields are required");
     error.statusCode = 400;
@@ -40,9 +43,21 @@ exports.createUser = async (user) => {
 
   const existingUser = await db("users").where({ email: user.email }).first();
   if (existingUser) {
-    const error = new Error("Email already exists");
-    error.statusCode = 400;
-    throw error;
+    if (existingUser.status === "inactive") {
+      const hashedPassword = await bcrypt.hash(user.password, SALT_ROUNDS);
+
+      await db("users").where({ id: existingUser.id }).update({
+        fullname: user.fullname,
+        password: hashedPassword,
+        updated_at: new Date(),
+      });
+
+      return;
+    } else {
+      const error = new Error("Email already exists");
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   if (user.password !== user.confirmPassword) {
@@ -57,14 +72,9 @@ exports.createUser = async (user) => {
     fullname: user.fullname,
     email: user.email,
     password: hashedPassword,
-    store_name: user.store_name || null,
-    profile: user.profile || null,
-    level_id: user.level_id,
-    status: user.status,
-    is_visible: true,
   };
 
-  return await db("users").insert(userToInsert);
+  await db("users").insert(userToInsert);
 };
 
 exports.loginService = async (email, password) => {
@@ -73,26 +83,52 @@ exports.loginService = async (email, password) => {
     error.statusCode = 400;
     throw error;
   }
-
   const user = await db("users").where({ email }).first();
+  if (user) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      const error = new Error("Invalid email or password");
+      error.statusCode = 401;
+      throw error;
+    }
+    const token = jwt.sign({ id: user.id, role: "admin" }, SECRET_KEY, {
+      expiresIn: "1h",
+    });
+    return { token, user_id: user.id, role: "admin" };
+  }
+
+  const staff = await db("staff").where({ email }).first();
+  if (staff) {
+    const isMatch = await bcrypt.compare(password, staff.password);
+    if (!isMatch) {
+      const error = new Error("Invalid email or password");
+      error.statusCode = 401;
+      throw error;
+    }
+    const token = jwt.sign({ id: staff.id, role: "staff" }, SECRET_KEY, {
+      expiresIn: "1h",
+    });
+    return { token, user_id: staff.id, role: "staff" };
+  }
+
+  const error = new Error("Invalid email or password");
+  error.statusCode = 401;
+  throw error;
+};
+
+exports.inActiveAccount = async (id, currentUserLevel) => {
+  const user = await db("users").where({ id }).first();
   if (!user) {
-    const error = new Error("Invalid email or password");
-    error.statusCode = 401;
+    const error = new Error("User ID not found!");
+    error.statusCode = 404;
     throw error;
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    const error = new Error("Invalid email or password");
-    error.statusCode = 401;
+  if (currentUserLevel !== 1) {
+    const error = new Error("Insufficient permissions to inactivate account");
+    error.statusCode = 403;
     throw error;
   }
-  const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
-  const { password: _, ...userWithoutPassword } = user;
-  const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, {
-    expiresIn: "1h",
-  });
-
-  return { token, userId: user.id };
+  await db("users").where({ id }).update({ status: "inactive" });
 };

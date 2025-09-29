@@ -14,7 +14,9 @@ exports.getAllLevels = async () => {
 exports.createLevels = async (dataLevels) => {
   const levelsArray = Array.isArray(dataLevels) ? dataLevels : [dataLevels];
   for (const level of levelsArray) {
-    const existing = await db("levels").where({ name: level.name }).first();
+    const existing = await db("levels")
+      .where({ level_name: level.level_name })
+      .first();
     if (existing) {
       const error = new Error(`Level name ${level.name} already exists!`);
       error.statusCode = 400;

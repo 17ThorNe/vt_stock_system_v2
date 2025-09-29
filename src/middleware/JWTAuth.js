@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const SECRET_KEY = process.env.JWT_SECRET || "mysecretkey";
+require("dotenv").config();
+const SECRET_KEY = process.env.JWT_SECRET;
 
 async function JWTAuth(request, reply) {
   try {
@@ -14,7 +15,6 @@ async function JWTAuth(request, reply) {
     }
 
     const decoded = jwt.verify(token, SECRET_KEY);
-
     request.user = decoded;
   } catch (err) {
     return reply.code(403).send({ error: "Invalid or expired token" });
