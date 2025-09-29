@@ -6,6 +6,11 @@ async function productRoute(fastify, option) {
     { preHandler: [JWTAuth] },
     productController.getAllProducts
   );
+  fastify.post(
+    "/create-products",
+    { preHandler: [JWTAuth] },
+    productController.createProduct
+  );
 }
 
 module.exports = productRoute;
