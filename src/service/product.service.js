@@ -1,7 +1,7 @@
 const db = require("../config/knex.js");
+const userIdValidate = require("../utils/userIdValidate.js");
 
 exports.getAllProduct = async (user_id, page = 1, limit = 10) => {
-  // check user exist
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -9,7 +9,6 @@ exports.getAllProduct = async (user_id, page = 1, limit = 10) => {
     throw error;
   }
 
-  // count total products (for pagination info)
   const total = await db("products")
     .where({ user_id, is_deleted: false })
     .count("id as count")
@@ -142,4 +141,107 @@ exports.createProduct = async (user_id, data) => {
   }
 
   await db("products").insert(productsToInsert);
+};
+
+exports.getProductById = async (id, user_id) => {
+  const user = await db("users").where({ id: user_id }).first();
+  if (!user) {
+    const error = new Error("User ID not found!");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const product = await db("products")
+    .where({ id, user_id, is_deleted: false })
+    .first();
+
+  if (!product) {
+    const error = new Error("Product not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return product;
+};
+
+exports.updateProduct = async (id, user_id, productData) => {
+  const user = await db("users").where({ id: user_id }).first();
+  if (!user) {
+    const error = new Error("User ID not found!");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const product = await db("products")
+    .where({ id, user_id, is_deleted: false })
+    .first();
+  if (!product) {
+    const error = new Error("Product not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  await db("products").where({ id, user_id }).update(productData);
+};
+
+exports.deleteProduct = async (id, user_id) => {
+  const user = await db("users").where({ id: user_id }).first();
+  if (!user) {
+    const error = new Error("User ID not found!");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const product = await db("products")
+    .where({ id, user_id, is_deleted: false })
+    .first();
+  if (!product) {
+    const error = new Error("Product not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  await db("products").where({ id, user_id }).update({ is_deleted: true });
+};
+
+exports.getProductByCategoryId = async (category_id, user_id) => {
+  await userIdValidate(user_id);
+
+  const category = await db("categories")
+    .where({ id: category_id, user_id, is_deleted: false })
+    .first();
+  if (!category) {
+    const error = new Error("Category not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const products = await db("products")
+    .where({ category_id, user_id, is_deleted: false })
+    .select("*");
+
+  if (products.length === 0) {
+    const error = new Error("No products found for this category");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return products;
+};
+
+exports.getProductByExpireDate = async (user_id, days = 7) => {
+  await userIdValidate(user_id);
+  const today = new Date();
+  const targetDate = new Date();
+  targetDate.setDate(today.getDate() + days);
+
+  const products = await db("products")
+    .where({ user_id, is_deleted: false })
+    .andWhere("expire_date", "<=", targetDate)
+    .select("*");
+  if (products.length === 0) {
+    const error = new Error("No expired products found");
+    error.statusCode = 404;
+    throw error;
+  }
+  return products;
 };

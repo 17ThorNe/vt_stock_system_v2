@@ -11,6 +11,31 @@ async function productRoute(fastify, option) {
     { preHandler: [JWTAuth] },
     productController.createProduct
   );
+  fastify.get(
+    "/get-products/:id",
+    { preHandler: [JWTAuth] },
+    productController.getProductById
+  );
+  fastify.put(
+    "/update-products/:id",
+    { preHandler: [JWTAuth] },
+    productController.updateProduct
+  );
+  fastify.put(
+    "/delete-products/:id",
+    { preHandler: [JWTAuth] },
+    productController.deleteProduct
+  );
+  fastify.get(
+    "/get-products-cat-id/:category_id",
+    { preHandler: [JWTAuth] },
+    productController.getProductByCategoryId
+  );
+  fastify.get(
+    "/get-products-expire",
+    { preHandler: [JWTAuth] },
+    productController.getProductByExpireDate
+  );
 }
 
 module.exports = productRoute;

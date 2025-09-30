@@ -3,6 +3,7 @@ const categoryService = require("../service/categories.service.js");
 
 exports.createCategory = async (request, reply) => {
   const user_id = request.user.id;
+  console.log("User ID in controller category:", user_id);
   const categoryDto = request.body;
   await handleController(request, reply, categoryService.createCategory, [
     user_id,

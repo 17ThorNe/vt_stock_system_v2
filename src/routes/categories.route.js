@@ -4,7 +4,7 @@ const { JWTAuth } = require("../middleware/JWTAuth.js");
 async function categoryRoutes(fastify, option) {
   fastify.post(
     "/create-category",
-   
+    { preHandler: [JWTAuth] },
     categoryController.createCategory
   );
   fastify.get(

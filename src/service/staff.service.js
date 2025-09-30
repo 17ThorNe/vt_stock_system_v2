@@ -53,7 +53,7 @@ exports.createStaff = async (user_id, staffData) => {
     status: status || "active",
     user_id,
   };
-  console.log("Inserting Staff:", staffToInsert);
+
   await db("staff").insert(staffToInsert);
 };
 
