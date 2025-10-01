@@ -16,6 +16,11 @@ async function customerRoute(fastify, option) {
     { preHandler: [JWTAuth] },
     customerController.getCustomerById
   );
+  fastify.get(
+    "/get-customer-sale-id/:sale_id",
+    { preHandler: [JWTAuth] },
+    customerController.getCustomerBySaleId
+  );
 }
 
 module.exports = customerRoute;
