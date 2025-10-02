@@ -7,6 +7,7 @@ const staffRoutes = require("./routes/staff.route.js");
 const categoryRoutes = require("./routes/categories.route.js");
 const productRoutes = require("./routes/product.route.js");
 const customerRoutes = require("./routes/customer.route.js");
+const orderRoutes = require("./routes/order.route.js");
 
 fastify.register(userRoutes, { prefix: "/stock_system/api/v2" });
 fastify.register(levelsRoutes, { prefix: "/stock_system/api/v2" });
@@ -14,6 +15,7 @@ fastify.register(staffRoutes, { prefix: "/stock_system/api/v2" });
 fastify.register(categoryRoutes, { prefix: "/stock_system/api/v2" });
 fastify.register(productRoutes, { prefix: "/stock_system/api/v2" });
 fastify.register(customerRoutes, { prefix: "/stock_system/api/v2" });
+fastify.register(orderRoutes, { prefix: "/stock_system/api/v2" });
 
 const start = async () => {
   try {

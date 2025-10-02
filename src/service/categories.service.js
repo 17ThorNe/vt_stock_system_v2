@@ -1,7 +1,18 @@
 const db = require("../config/knex.js");
+const validateError = require("../utils/validateError.js");
 require("dotenv").config();
 
-exports.createCategory = async (user_id, categoryDto) => {
+const permission = {
+  admin: "admin",
+  inventory: "inventory_mananger",
+  sale_person: "sale_person",
+};
+
+exports.createCategory = async (user_id, categoryDto, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
+
   const checkUserId = await db("users").where({ id: user_id }).first();
   if (!checkUserId) {
     const error = new Error("User ID not found!");
@@ -33,7 +44,14 @@ exports.createCategory = async (user_id, categoryDto) => {
   await db("categories").insert(categoriesToInsert);
 };
 
-exports.getAllCategory = async (user_id) => {
+exports.getAllCategory = async (user_id, permissinRole) => {
+  if (
+    ![permission.admin, permission.inventory, permission.sale_person].includes(
+      permissinRole
+    )
+  ) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -53,7 +71,14 @@ exports.getAllCategory = async (user_id) => {
   return result;
 };
 
-exports.getCategoryById = async (id, user_id) => {
+exports.getCategoryById = async (id, user_id, permissinRole) => {
+  if (
+    ![permission.admin, permission.inventory, permission.sale_person].includes(
+      permissinRole
+    )
+  ) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -72,7 +97,10 @@ exports.getCategoryById = async (id, user_id) => {
   return category;
 };
 
-exports.updateCategory = async (id, user_id, data) => {
+exports.updateCategory = async (id, user_id, data, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -106,7 +134,10 @@ exports.updateCategory = async (id, user_id, data) => {
   await db("categories").where({ id, user_id }).update(data);
 };
 
-exports.deleteCategory = async (id, user_id) => {
+exports.deleteCategory = async (id, user_id, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");

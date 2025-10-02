@@ -3,23 +3,22 @@ const staffService = require("../service/staff.service.js");
 
 exports.createStaff = async (request, reply) => {
   const user_id = request.user.id;
-  console.log("user id : ", user_id);
+  const { role } = request.user;
   const staffData = request.body;
   await handleController(request, reply, staffService.createStaff, [
     user_id,
     staffData,
+    role,
   ]);
 };
 
 exports.getAllStaff = async (request, reply) => {
   const user_id = request.user.id;
-  const result = await handleController(
-    request,
-    reply,
-    staffService.getAllStaff,
-    [user_id]
-  );
-  console.table(result);
+  const { role } = request.user;
+  await handleController(request, reply, staffService.getAllStaff, [
+    user_id,
+    role,
+  ]);
 };
 
 exports.getStaffById = async (request, reply) => {

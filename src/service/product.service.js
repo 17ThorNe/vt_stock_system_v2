@@ -1,7 +1,27 @@
 const db = require("../config/knex.js");
 const userIdValidate = require("../utils/userIdValidate.js");
+const validateError = require("../utils/validateError.js");
 
-exports.getAllProduct = async (user_id, page = 1, limit = 10) => {
+const permission = {
+  admin: "admin",
+  inventory: "inventory_mananger",
+  sale_person: "sale_person",
+};
+
+exports.getAllProduct = async (
+  user_id,
+  page = 1,
+  limit = 10,
+  permissinRole
+) => {
+  if (
+    ![permission.admin, permission.inventory, permission.sale_person].includes(
+      permissinRole
+    )
+  ) {
+    throw validateError("No permission", 403);
+  }
+
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -40,7 +60,11 @@ exports.getAllProduct = async (user_id, page = 1, limit = 10) => {
   };
 };
 
-exports.createProduct = async (user_id, data) => {
+exports.createProduct = async (user_id, data, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
+
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -143,7 +167,15 @@ exports.createProduct = async (user_id, data) => {
   await db("products").insert(productsToInsert);
 };
 
-exports.getProductById = async (id, user_id) => {
+exports.getProductById = async (id, user_id, permissinRole) => {
+  if (
+    ![permission.admin, permission.inventory, permission.sale_person].includes(
+      permissinRole
+    )
+  ) {
+    throw validateError("No have permission", 403);
+  }
+
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -164,7 +196,10 @@ exports.getProductById = async (id, user_id) => {
   return product;
 };
 
-exports.updateProduct = async (id, user_id, productData) => {
+exports.updateProduct = async (id, user_id, productData, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -184,7 +219,10 @@ exports.updateProduct = async (id, user_id, productData) => {
   await db("products").where({ id, user_id }).update(productData);
 };
 
-exports.deleteProduct = async (id, user_id) => {
+exports.deleteProduct = async (id, user_id, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
   const user = await db("users").where({ id: user_id }).first();
   if (!user) {
     const error = new Error("User ID not found!");
@@ -203,7 +241,18 @@ exports.deleteProduct = async (id, user_id) => {
   await db("products").where({ id, user_id }).update({ is_deleted: true });
 };
 
-exports.getProductByCategoryId = async (category_id, user_id) => {
+exports.getProductByCategoryId = async (
+  category_id,
+  user_id,
+  permissinRole
+) => {
+  if (
+    ![permission.admin, permission.inventory, permission.sale_person].includes(
+      permissinRole
+    )
+  ) {
+    throw validateError("No have permission!", 403);
+  }
   await userIdValidate(user_id);
 
   const category = await db("categories")
@@ -228,7 +277,10 @@ exports.getProductByCategoryId = async (category_id, user_id) => {
   return products;
 };
 
-exports.getProductByExpireDate = async (user_id, days = 7) => {
+exports.getProductByExpireDate = async (user_id, days = 7, permissinRole) => {
+  if (![permission.admin, permission.inventory].includes(permissinRole)) {
+    throw validateError("No have permission", 403);
+  }
   await userIdValidate(user_id);
   const today = new Date();
   const targetDate = new Date();

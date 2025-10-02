@@ -1,9 +1,12 @@
 const db = require("../config/knex.js");
 const bcrypt = require("bcrypt");
+const validateError = require("../utils/validateError.js");
 require("dotenv").config();
 const SALT_ROUNDS = 10;
 
-exports.createStaff = async (user_id, staffData) => {
+const superAdmin = "super_admin";
+
+exports.createStaff = async (user_id, staffData, permissinRole) => {
   const {
     fullname,
     email,
@@ -13,6 +16,10 @@ exports.createStaff = async (user_id, staffData) => {
     permission_lvl,
     status,
   } = staffData;
+
+  if (permissinRole !== superAdmin) {
+    throw validateError("No have permission", 403);
+  }
 
   if (
     !fullname ||
@@ -57,7 +64,11 @@ exports.createStaff = async (user_id, staffData) => {
   await db("staff").insert(staffToInsert);
 };
 
-exports.getAllStaff = async (user_id) => {
+exports.getAllStaff = async (user_id, permissinRole) => {
+  if (permissinRole !== superAdmin) {
+    throw validateError("No have permission!", 403);
+  }
+
   const checkUserId = await db("users").where({ id: user_id }).first();
   if (!checkUserId) {
     const error = new Error("User ID not found!");
@@ -68,6 +79,7 @@ exports.getAllStaff = async (user_id) => {
   const result = await db("staff")
     .where({ user_id })
     .andWhere({ status: "active" });
+
   if (result.length === 0) {
     const error = new Error("No staff found");
     error.statusCode = 200;

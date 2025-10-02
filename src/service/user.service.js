@@ -84,7 +84,6 @@ exports.loginService = async (email, password) => {
     throw error;
   }
 
-  // ------------------- ADMIN LOGIN -------------------
   const user = await db("users").where({ email }).first();
   if (user) {
     const isMatch = await bcrypt.compare(password, user.password);
@@ -94,17 +93,15 @@ exports.loginService = async (email, password) => {
       throw error;
     }
 
-    // admin: user.id = user_id
     const token = jwt.sign(
-      { id: user.id, user_id: user.id, role: "admin" },
+      { id: user.id, user_id: user.id, role: "super_admin" },
       SECRET_KEY,
       { expiresIn: "1h" }
     );
 
-    return { token, user_id: user.id, role: "admin" };
+    return { token, user_id: user.id, role: "super_admin" };
   }
 
-  // ------------------- STAFF LOGIN -------------------
   const staff = await db("staff").where({ email }).first();
   if (staff) {
     const isMatch = await bcrypt.compare(password, staff.password);
@@ -116,17 +113,17 @@ exports.loginService = async (email, password) => {
 
     let directionPermission;
     if (staff.permission_lvl === 1) {
-      directionPermission = "inventory_manager";
+      directionPermission = "admin";
     } else if (staff.permission_lvl === 2) {
-      directionPermission = "sale_person";
+      directionPermission = "inventory_mananger";
     } else if (staff.permission_lvl === 3) {
-      directionPermission = "finance";
+      directionPermission = "sale_person";
     } else if (staff.permission_lvl === 4) {
+      directionPermission = "finance";
+    } else if (staff.permission_lvl === 5) {
       directionPermission = "delivery";
     }
 
-    // staff.id = staff table id
-    // staff.user_id = link to users table
     const token = jwt.sign(
       { sale_id: staff.id, user_id: staff.user_id, role: directionPermission },
       SECRET_KEY,
@@ -141,7 +138,6 @@ exports.loginService = async (email, password) => {
     };
   }
 
-  // ------------------- INVALID -------------------
   const error = new Error("Invalid email or password");
   error.statusCode = 401;
   throw error;
