@@ -9,7 +9,7 @@ exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
   await userIdValidate(user_id);
   const salePersons = await db("staff").where({
     user_id: user_id,
-    permission_lvl: 2,
+    permission_lvl: 3,
   });
   if (
     permissinRole === adminPermission ||
@@ -98,7 +98,7 @@ exports.getCustomerBySaleId = async (user_id, sale_person, permissinRole) => {
 
   const resultStaff = await db("staff")
     .select("*")
-    .where({ user_id: user_id, permission_lvl: 2, status: "active" });
+    .where({ user_id: user_id, permission_lvl: 3, status: "active" });
 
   if (!resultStaff) {
     throw validateError("Staff", 404);

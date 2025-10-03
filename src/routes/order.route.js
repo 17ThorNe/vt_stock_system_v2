@@ -7,6 +7,26 @@ async function orderRoutes(fastify, option) {
     { preHandler: [JWTAuth] },
     orderController.createOrder
   );
+  fastify.get(
+    "/get-order",
+    { preHandler: [JWTAuth] },
+    orderController.getAllOrders
+  );
+  fastify.get(
+    "/get-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.getOrderById
+  );
+  fastify.put(
+    "/update-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.updateOrder
+  );
+  fastify.put(
+    "/approve-reject-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.approveOrReject
+  );
 }
 
 module.exports = orderRoutes;

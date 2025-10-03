@@ -12,7 +12,7 @@ const knex = require("knex")({
 async function validateConnection() {
   try {
     await knex.raw("SELECT 1+1 AS result");
-    console.log("Database connection is OK!");
+    // console.log("Database connection is OK!");
   } catch (error) {
     console.error("❌ Database connection failed:", err.message);
     process.exit(1);

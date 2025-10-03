@@ -1,4 +1,4 @@
-const fastify = require("fastify")({ logger: true });
+const fastify = require("fastify")({ logger: false });
 const knex = require("./config/knex.js");
 const userRoutes = require("./routes/user.route.js");
 require("dotenv").config();

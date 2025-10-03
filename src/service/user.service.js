@@ -115,7 +115,7 @@ exports.loginService = async (email, password) => {
     if (staff.permission_lvl === 1) {
       directionPermission = "admin";
     } else if (staff.permission_lvl === 2) {
-      directionPermission = "inventory_mananger";
+      directionPermission = "inventory_manager";
     } else if (staff.permission_lvl === 3) {
       directionPermission = "sale_person";
     } else if (staff.permission_lvl === 4) {
