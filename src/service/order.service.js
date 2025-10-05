@@ -2,51 +2,46 @@ const db = require("../config/knex.js");
 const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
 const permission = require("../utils/permission.js");
+const { data } = require("react-router-dom");
 
-exports.createOrder = async (user_id, sale_person, permissionRole, data) => {
+exports.createOrder = async (user_id, orders, permissionRole) => {
+  await userIdValidate(user_id);
+
   if (![permission.admin, permission.sale_person].includes(permissionRole)) {
     throw validateError("No have permission", 403);
   }
 
-  await userIdValidate(user_id);
+  for (const order of orders) {
+    const saleId = order.sale_person;
 
-  const checkSaleId = await db("staff")
-    .where({
-      user_id: user_id,
-      permission_lvl: 3,
-      status: "active",
-    })
-    .first();
-
-  if (!checkSaleId) {
-    throw validateError("Sale ID", 404);
-  }
-
-  const ordersArray = Array.isArray(data) ? data : [data];
-
-  for (const order of ordersArray) {
-    const customer = await db("customers")
-      .where({
-        id: order.customer_id,
-        sale_person: sale_person,
-        is_deleted: false,
-      })
+    const salePerson = await db("staff")
+      .where({ id: saleId, permission_lvl: 3, status: "active" })
       .first();
 
+    if (!salePerson) {
+      throw validateError(`Sale person ID ${saleId} not found`, 404);
+    }
+
+    let customerQuery = db("customers").where({
+      id: order.customer_id,
+      is_deleted: false,
+    });
+
+    if (permissionRole === permission.sale_person) {
+      customerQuery.andWhere({ sale_person: saleId });
+    }
+
+    const customer = await customerQuery.first();
     if (!customer) {
-      throw validateError("Customer ID", 404);
+      throw validateError(`Customer ID ${order.customer_id} not found`, 404);
     }
   }
 
-  const dataToInsert = ordersArray.map((order) => ({
+  const dataToInsert = orders.map((order) => ({
     ...order,
-    sale_person,
     user_id,
   }));
-
   await db("orders").insert(dataToInsert);
-
-  return { message: "Orders created successfully", count: dataToInsert.length };
 };
 
 exports.getAllOrder = async (
@@ -56,7 +51,6 @@ exports.getAllOrder = async (
   page = 1,
   limit = 10
 ) => {
-  // 1. Permission check
   if (
     ![permission.admin, permission.inventory, permission.sale_person].includes(
       permissionRole
@@ -65,30 +59,24 @@ exports.getAllOrder = async (
     throw validateError("No permission to view orders", 403);
   }
 
-  // 2. Validate user exists
   await userIdValidate(user_id);
 
-  // 3. Pagination setup
   const offset = (page - 1) * limit;
 
   let query = db("orders").where({ user_id, is_deleted: false });
 
-  // 4. Role-based filter
   if (permissionRole === permission.sale_person) {
     query = query.andWhere({ sale_person });
   }
 
-  // 5. Get data
   const result = await query.clone().select("*").limit(limit).offset(offset);
 
-  // 6. Count total
   const [{ count }] = await query.clone().count("* as count");
 
   if (result.length === 0) {
     throw validateError("Order not found!", 404);
   }
 
-  // 7. Return with pagination
   return {
     data: result,
     pagination: {
@@ -167,7 +155,7 @@ exports.updateOrder = async (
   await db("orders").update(dataUpdate);
 };
 
-exports.approveOrReject = async (
+exports.inventoryManagerApproveOrReject = async (
   user_id,
   inventoryManagerId,
   order_id,
@@ -206,4 +194,69 @@ exports.approveOrReject = async (
     .where({ id: order_id, is_deleted: false });
 
   return { updatedRows: updated, newStatus };
+};
+
+exports.deleteOrder = async (
+  user_id,
+  sale_person,
+  order_id,
+  permissionRole
+) => {
+  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+    throw validateError("No have permission", 403);
+  }
+  await userIdValidate(user_id);
+  const checkSalePerson = await db("staff")
+    .select("*")
+    .where({ user_id, permission_lvl: 3, status: "active" });
+
+  if (checkSalePerson.length === 0) {
+    throw validateError("Sale person", 404);
+  }
+
+  if (permissionRole === permission.admin) {
+    const checkOrderId = await db("orders")
+      .select("*")
+      .where({ user_id, is_deleted: false, id: order_id });
+
+    if (checkOrderId.length === 0) {
+      throw validateError("Order ID", 404);
+    }
+  } else if (permissionRole === permission.sale_person) {
+    const checkOrderId = await db("orders")
+      .select("*")
+      .where({ user_id, sale_person, is_deleted: false, id: order_id });
+
+    if (checkOrderId.length === 0) {
+      throw validateError("Order ID", 404);
+    }
+  }
+
+  if (permissionRole === permission.sale_person) {
+    await db("orders")
+      .select("*")
+      .where({ user_id, sale_person, is_deleted: false, id: order_id })
+      .update({ is_deleted: true });
+  } else if (permissionRole === permission.admin) {
+    await db("orders")
+      .select("*")
+      .where({ user_id, is_deleted: false, id: order_id })
+      .update({ is_deleted: true });
+  }
+};
+
+exports.postTestRole = async (user_id, sale_person, permissionRole, data) => {
+  console.log("User ID: ", user_id);
+  console.log("Sale Person: ", sale_person);
+  console.log("Permission role: ", permissionRole);
+  console.log("Data to post:", data);
+};
+
+exports.financeApprovePayment = async (
+  user_id,
+  sale_person,
+  permissionRole,
+  data
+) => {
+   
 };

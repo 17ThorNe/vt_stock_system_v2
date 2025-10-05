@@ -5,17 +5,12 @@ const db = require("../config/knex.js");
 exports.createCustomer = async (request, reply) => {
   const { user_id, role, sale_id: tokenSaleId } = request.user;
   const data = request.body;
+
   let finalSaleId;
   if (role === "admin") {
     finalSaleId = data.sale_person;
   } else if (role === "sale_person") {
     finalSaleId = tokenSaleId;
-  }
-
-  if (role === "admin") {
-    console.log("Admin Data", { ...data, sale_id: finalSaleId });
-  } else if (role === "sale_person") {
-    console.log("Sale person Data", { ...data, sale_id: finalSaleId });
   }
 
   await handleController(request, reply, customerService.createCustomer, [

@@ -25,7 +25,17 @@ async function orderRoutes(fastify, option) {
   fastify.put(
     "/approve-reject-order/:id",
     { preHandler: [JWTAuth] },
-    orderController.approveOrReject
+    orderController.inventoryManagerApproveOrReject
+  );
+  fastify.put(
+    "/delete-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.deleteOrder
+  );
+  fastify.post(
+    "/post-test-order",
+    { preHandler: [JWTAuth] },
+    orderController.postTestRole
   );
 }
 
