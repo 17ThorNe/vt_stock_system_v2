@@ -94,14 +94,22 @@ exports.updateOrder = async (request, reply) => {
 };
 
 exports.inventoryManagerApproveOrReject = async (request, reply) => {
-  const { user_id, role, sale_id } = request.user;
+  const { user_id, role, sale_id: tokenStaffID } = request.user;
   const id = request.params.id;
-  const { action } = request.body;
+  const { action, staff_id } = request.body;
+
+  let finalStaffId;
+  if (role === permission.admin) {
+    finalStaffId = staff_id;
+  } else if (role === permission.inventory) {
+    finalStaffId = tokenStaffID;
+  }
+
   await handleController(
     request,
     reply,
     orderService.inventoryManagerApproveOrReject,
-    [user_id, sale_id, id, role, action]
+    [user_id, finalStaffId, id, role, action]
   );
 };
 
@@ -138,5 +146,45 @@ exports.postTestRole = async (request, reply) => {
     supportSaleId,
     role,
     data,
+  ]);
+};
+
+exports.financeApprovePayment = async (request, reply) => {
+  const { user_id, role, sale_id: tokenStaffId } = request.user;
+  const id = request.params.id;
+  const data = request.body;
+
+  let finalStaffId;
+  if (role === permission.admin) {
+    finalStaffId = data.staff_id;
+  } else if (role === permission.finance) {
+    finalStaffId = tokenStaffId;
+  }
+
+  await handleController(request, reply, orderService.financeApprovePayment, [
+    user_id,
+    finalStaffId,
+    id,
+    role,
+  ]);
+};
+
+exports.deliveryApprove = async (request, reply) => {
+  const { user_id, sale_id: tokenStaffId, role } = request.user;
+  const id = request.params.id;
+  const { staff_id } = request.body;
+
+  let finalStaffId;
+  if (role === permission.admin) {
+    finalStaffId = staff_id;
+  } else if (role === permission.delivery) {
+    finalStaffId = tokenStaffId;
+  }
+  console.log(`Hello final staff id : `, finalStaffId);
+  await handleController(request, reply, orderService.deliveryApprove, [
+    user_id,
+    finalStaffId,
+    id,
+    role,
   ]);
 };

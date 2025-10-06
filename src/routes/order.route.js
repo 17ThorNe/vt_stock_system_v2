@@ -37,6 +37,16 @@ async function orderRoutes(fastify, option) {
     { preHandler: [JWTAuth] },
     orderController.postTestRole
   );
+  fastify.put(
+    "/finance-approve-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.financeApprovePayment
+  );
+  fastify.put(
+    "/delivery-approve-order/:id",
+    { preHandler: [JWTAuth] },
+    orderController.deliveryApprove
+  );
 }
 
 module.exports = orderRoutes;

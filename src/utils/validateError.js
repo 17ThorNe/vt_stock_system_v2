@@ -9,7 +9,7 @@ const validateError = (message, statusCode = 400) => {
       errorMessage = `${message} - Forbidden!`;
       break;
     case 401:
-      errorMessage = `${message} - Unauthorized!`;
+      errorMessage = `${message} - !`;
       break;
     case 400:
       errorMessage = `${message} - Bad Request!`;

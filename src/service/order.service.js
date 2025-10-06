@@ -2,7 +2,7 @@ const db = require("../config/knex.js");
 const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
 const permission = require("../utils/permission.js");
-const { data } = require("react-router-dom");
+const statusCodePermission = require("../utils/statusCodePermission.js");
 
 exports.createOrder = async (user_id, orders, permissionRole) => {
   await userIdValidate(user_id);
@@ -52,9 +52,12 @@ exports.getAllOrder = async (
   limit = 10
 ) => {
   if (
-    ![permission.admin, permission.inventory, permission.sale_person].includes(
-      permissionRole
-    )
+    ![
+      permission.admin,
+      permission.inventory,
+      permission.sale_person,
+      permission.finance,
+    ].includes(permissionRole)
   ) {
     throw validateError("No permission to view orders", 403);
   }
@@ -163,37 +166,51 @@ exports.inventoryManagerApproveOrReject = async (
   action
 ) => {
   if (![permission.admin, permission.inventory].includes(permissionRole)) {
-    throw validateError("No permission to approve/reject orders", 403);
+    throw validateError(
+      "No permission to approve/reject orders",
+      statusCodePermission.noHavePermission
+    );
   }
-
   await userIdValidate(user_id);
 
-  const order = await db("orders")
+  const checkStaffId = await db("staff").select("*").where({
+    user_id,
+    id: inventoryManagerId,
+    permission_lvl: 2,
+    status: "active",
+  });
+  if (checkStaffId.length === 0) {
+    throw validateError("Staff ID", statusCodePermission.notFoundPermiision);
+  }
+  const checkOrderId = await db("orders")
     .select("*")
-    .where({ id: order_id, is_deleted: false })
-    .first();
+    .where({ user_id, id: order_id, is_deleted: false });
 
-  if (!order) {
-    throw validateError("Order not found", 404);
+  if (checkOrderId.length === 0) {
+    throw validateError("Order ID", statusCodePermission.notFoundPermiision);
   }
 
-  let newStatus;
+  let actionTestApproveOrReject;
   if (action === "approve") {
-    newStatus = "APPROVED_BY_INVENTORY";
+    actionTestApproveOrReject = "APPROVED_BY_INVENTORY";
   } else if (action === "reject") {
-    newStatus = "REJECTED_BY_INVENTORY";
+    actionTestApproveOrReject = "REJECTED_BY_INVENTORY";
   } else {
-    throw validateError("Invalid action. Use approve/reject", 400);
+    throw validateError("Status tupe", statusCodePermission.notFoundPermiision);
   }
+  console.log(`Hello action: ${actionTestApproveOrReject}`);
 
-  const updated = await db("orders")
-    .update({
-      status: newStatus,
-      inventory_manager_id: inventoryManagerId,
+  await db("orders")
+    .select("*")
+    .where({
+      user_id,
+      id: order_id,
+      is_deleted: false,
     })
-    .where({ id: order_id, is_deleted: false });
-
-  return { updatedRows: updated, newStatus };
+    .update({
+      inventory_manager_id: inventoryManagerId,
+      status: actionTestApproveOrReject,
+    });
 };
 
 exports.deleteOrder = async (
@@ -208,7 +225,7 @@ exports.deleteOrder = async (
   await userIdValidate(user_id);
   const checkSalePerson = await db("staff")
     .select("*")
-    .where({ user_id, permission_lvl: 3, status: "active" });
+    .where({ user_id, permission_lvl: 3, id: sale_person, status: "active" });
 
   if (checkSalePerson.length === 0) {
     throw validateError("Sale person", 404);
@@ -255,8 +272,75 @@ exports.postTestRole = async (user_id, sale_person, permissionRole, data) => {
 exports.financeApprovePayment = async (
   user_id,
   sale_person,
-  permissionRole,
-  data
+  orderId,
+  permissionRole
 ) => {
-   
+  console.log("Data: ", user_id, sale_person, orderId, permissionRole);
+
+  if (![permission.admin, permission.finance].includes(permissionRole)) {
+    throw validateError("No have permission", 403);
+  }
+
+  await userIdValidate(user_id);
+
+  const checkStaffId = await db("staff")
+    .select("*")
+    .where({ user_id, permission_lvl: 4, id: sale_person, status: "active" });
+
+  console.log("checkstaff id:", checkStaffId);
+
+  if (checkStaffId.length === 0) {
+    throw validateError("Staff ID", 404);
+  }
+
+  const checkOrderId = await db("orders")
+    .select("*")
+    .where({ user_id, id: orderId, is_deleted: false });
+
+  if (checkOrderId.length === 0) {
+    throw validateError("Order ID", 404);
+  }
+
+  await db("orders")
+    .select("*")
+    .where({ user_id, id: orderId, is_deleted: false })
+    .update({ status: "READY_FOR_PAYMENT", finance_id: sale_person });
+};
+
+exports.deliveryApprove = async (
+  user_id,
+  staff_id,
+  order_id,
+  permissionRole
+) => {
+  console.log("User data: ", user_id, staff_id, order_id, permissionRole);
+  await userIdValidate(user_id);
+
+  if (![permission.admin, permission.delivery].includes(permissionRole)) {
+    throw validateError(
+      "No have permission",
+      statusCodePermission.noHavePermission
+    );
+  }
+
+  const checkStaffId = await db("staff")
+    .select("*")
+    .where({ user_id, permission_lvl: 5, id: staff_id, status: "active" });
+
+  if (checkStaffId.length === 0) {
+    throw validateError("Staff ID", statusCodePermission.notFoundPermiision);
+  }
+
+  const checkOrderId = await db("orders")
+    .select("*")
+    .where({ user_id, id: order_id, is_deleted: false });
+
+  if (checkOrderId.length === 0) {
+    throw validateError("Order ID", statusCodePermission.notFoundPermiision);
+  }
+
+  await db("orders")
+    .select("*")
+    .where({ user_id, id: order_id, is_deleted: false })
+    .update({ delivery_id: staff_id, status: "DELIVERED" });
 };
