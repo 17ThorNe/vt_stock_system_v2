@@ -1,26 +1,41 @@
+const path = require("path");
 const fastify = require("fastify")({ logger: false });
 const knex = require("./config/knex.js");
-const userRoutes = require("./routes/user.route.js");
 require("dotenv").config();
+
+// Routes
+const userRoutes = require("./routes/user.route.js");
 const levelsRoutes = require("./routes/levels.route.js");
 const staffRoutes = require("./routes/staff.route.js");
 const categoryRoutes = require("./routes/categories.route.js");
 const productRoutes = require("./routes/product.route.js");
 const customerRoutes = require("./routes/customer.route.js");
 const orderRoutes = require("./routes/order.route.js");
+const uploadRoutes = require("./routes/upload.route.js");
 
-fastify.register(userRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(levelsRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(staffRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(categoryRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(productRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(customerRoutes, { prefix: "/stock_system/api/v2" });
-fastify.register(orderRoutes, { prefix: "/stock_system/api/v2" });
+fastify.register(require("@fastify/multipart"));
+
+fastify.register(require("@fastify/static"), {
+  root: path.join(__dirname, "uploads"),
+  prefix: "/uploads/",
+});
+
+const prefix = "/stock_system/api/v2";
+fastify.register(userRoutes, { prefix });
+fastify.register(levelsRoutes, { prefix });
+fastify.register(staffRoutes, { prefix });
+fastify.register(categoryRoutes, { prefix });
+fastify.register(productRoutes, { prefix });
+fastify.register(customerRoutes, { prefix });
+fastify.register(orderRoutes, { prefix });
+fastify.register(uploadRoutes, { prefix });
 
 const start = async () => {
   try {
-    fastify.listen({ port: process.env.PORT });
-    console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
+    fastify.listen({ port: process.env.PORT || 3000 });
+    console.log(
+      `🚀 Server running at http://localhost:${process.env.PORT || 3000}`
+    );
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

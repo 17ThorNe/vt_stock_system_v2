@@ -21,6 +21,16 @@ async function customerRoute(fastify, option) {
     { preHandler: [JWTAuth] },
     customerController.getCustomerBySaleId
   );
+  fastify.put(
+    "/update-customer/:id",
+    { preHandler: [JWTAuth] },
+    customerController.updateCustomer
+  );
+  fastify.put(
+    "/delete-customer/:id",
+    { preHandler: [JWTAuth] },
+    customerController.deleteCustomer
+  );
 }
 
 module.exports = customerRoute;

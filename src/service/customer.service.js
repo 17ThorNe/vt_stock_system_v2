@@ -1,9 +1,8 @@
 const db = require("../config/knex.js");
+const permission = require("../utils/permission.js");
+const statusCodePermission = require("../utils/statusCodePermission.js");
 const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
-
-const salePersonPermission = "sale_person";
-const adminPermission = "admin";
 
 exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
   await userIdValidate(user_id);
@@ -11,9 +10,10 @@ exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
     user_id: user_id,
     permission_lvl: 3,
   });
+
   if (
-    permissinRole === adminPermission ||
-    permissinRole === salePersonPermission
+    permissinRole === permission.admin ||
+    permissinRole === permission.sale_person
   ) {
     if (salePersons.length === 0) {
       const error = new Error("Sale person not found!");
@@ -40,13 +40,13 @@ exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
 exports.getAllCustomer = async (user_id, sale_id, permissionRole) => {
   await userIdValidate(user_id);
 
-  if (permissionRole === adminPermission) {
+  if (permissionRole === permission.admin) {
     return await db("customers")
       .select("*")
       .where({ user_id: user_id, is_deleted: false });
   }
 
-  if (permissionRole === salePersonPermission) {
+  if (permissionRole === permission.sale_person) {
     if (!sale_id) {
       const error = new Error("Sale person ID is required!");
       error.statusCode = 400;
@@ -66,13 +66,13 @@ exports.getCustomerById = async (user_id, sale_id, id, permissionRole) => {
   await userIdValidate(user_id);
 
   if (
-    permissionRole !== adminPermission &&
-    permissionRole !== salePersonPermission
+    permissionRole !== permission.admin &&
+    permissionRole !== permission.sale_person
   ) {
     throw validateError("You no have permission", 403);
   }
 
-  if (permissionRole === adminPermission) {
+  if (permissionRole === permission.admin) {
     const result = await db("customers")
       .select("*")
       .where({ user_id: user_id, is_deleted: false, id: id })
@@ -80,7 +80,7 @@ exports.getCustomerById = async (user_id, sale_id, id, permissionRole) => {
     return result;
   }
 
-  if (permissionRole === salePersonPermission) {
+  if (permissionRole === permission.sale_person) {
     const result = await db("customers")
       .select("*")
       .where({ user_id: user_id, sale_person: sale_id, id: id })
@@ -104,7 +104,7 @@ exports.getCustomerBySaleId = async (user_id, sale_person, permissinRole) => {
     throw validateError("Staff", 404);
   }
 
-  if (permissinRole === adminPermission) {
+  if (permissinRole === permission.admin) {
     const resultCustomer = await db("customers").select("*").where({
       user_id: user_id,
       sale_person: sale_person,
@@ -116,7 +116,142 @@ exports.getCustomerBySaleId = async (user_id, sale_person, permissinRole) => {
     return resultCustomer;
   }
 
-  if (permissinRole !== adminPermission) {
+  if (permissinRole !== permission.admin) {
     throw validateError("No permission", 403);
   }
+};
+
+exports.updateCustomer = async (
+  user_id,
+  staff_id,
+  customer_id,
+  permissinRole,
+  data
+) => {
+  if (![permission.admin, permission.sale_person].includes(permissinRole)) {
+    throw validateError(
+      "No have permission",
+      statusCodePermission.noHavePermission
+    );
+  }
+  await userIdValidate(user_id);
+
+  const checkStaffId = await db("staff").select("*").where({
+    user_id,
+    id: staff_id,
+    permission_lvl: 3,
+    status: "active",
+  });
+
+  if (checkStaffId.length === 0) {
+    throw validateError("Staff ID", statusCodePermission.notFoundPermiision);
+  }
+
+  if (permissinRole === permission.admin) {
+    const checkCustomerId = await db("customers").select("*").where({
+      user_id,
+      id: customer_id,
+      is_deleted: false,
+    });
+
+    if (checkCustomerId.length === 0) {
+      throw validateError(
+        "Customer ID",
+        statusCodePermission.notFoundPermiision
+      );
+    }
+  } else if (permissinRole === permission.sale_person) {
+    const checkCustomerId = await db("customers").select("*").where({
+      user_id,
+      sale_person: staff_id,
+      id: customer_id,
+      is_deleted: false,
+    });
+
+    if (checkCustomerId.length === 0) {
+      throw validateError(
+        "Customer ID",
+        statusCodePermission.notFoundPermiision
+      );
+    }
+  }
+
+  const finalDataUpdate = {
+    ...data,
+    user_id,
+    sale_person: staff_id,
+  };
+
+  if (permissinRole === permission.admin) {
+    await db("customers")
+      .select("*")
+      .where({
+        user_id,
+        id: customer_id,
+        is_deleted: false,
+      })
+      .update(finalDataUpdate);
+  } else if (permissinRole === permission.sale_person) {
+    await db("customers")
+      .select("*")
+      .where({
+        user_id,
+        sale_person: staff_id,
+        id: customer_id,
+        is_deleted: false,
+      })
+      .update(finalDataUpdate);
+  }
+};
+
+exports.deleteCustomer = async (
+  user_id,
+  staff_id,
+  customer_id,
+  permissionRole
+) => {
+  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+    throw validateError(
+      "No have permission",
+      statusCodePermission.noHavePermission
+    );
+  }
+
+  await userIdValidate(user_id);
+
+  const checkStaff = await db("staff").select("*").where({
+    user_id,
+    id: staff_id,
+    permission_lvl: 3,
+    status: "active",
+  });
+
+  if (checkStaff.length === 0) {
+    throw validateError(
+      "Staff ID inactive or not found",
+      statusCodePermission.notFoundPermiision
+    );
+  }
+
+  let customerQuery = db("customers").select("*").where({
+    user_id,
+    id: customer_id,
+    is_deleted: false,
+  });
+
+  if (permissionRole === permission.sale_person) {
+    customerQuery.andWhere({ sale_person: staff_id });
+  }
+
+  const checkCustomer = await customerQuery;
+  if (checkCustomer.length === 0) {
+    throw validateError(
+      "Customer ID not found",
+      statusCodePermission.notFoundPermiision
+    );
+  }
+
+  await db("customers")
+    .update({ is_deleted: true })
+    .where({ id: customer_id, user_id });
 };
