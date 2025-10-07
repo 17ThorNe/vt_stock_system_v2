@@ -3,7 +3,6 @@ const fastify = require("fastify")({ logger: false });
 const knex = require("./config/knex.js");
 require("dotenv").config();
 
-// Routes
 const userRoutes = require("./routes/user.route.js");
 const levelsRoutes = require("./routes/levels.route.js");
 const staffRoutes = require("./routes/staff.route.js");
@@ -12,6 +11,7 @@ const productRoutes = require("./routes/product.route.js");
 const customerRoutes = require("./routes/customer.route.js");
 const orderRoutes = require("./routes/order.route.js");
 const uploadRoutes = require("./routes/upload.route.js");
+const orderItemRoutes = require("./routes/orderItems.route.js");
 
 fastify.register(require("@fastify/multipart"));
 
@@ -29,6 +29,7 @@ fastify.register(productRoutes, { prefix });
 fastify.register(customerRoutes, { prefix });
 fastify.register(orderRoutes, { prefix });
 fastify.register(uploadRoutes, { prefix });
+fastify.register(orderItemRoutes, { prefix });
 
 const start = async () => {
   try {
