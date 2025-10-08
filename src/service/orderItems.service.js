@@ -3,6 +3,7 @@ const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
 const permission = require("../utils/permission.js");
 const statusCodePermission = require("../utils/statusCodePermission.js");
+const logJSON = require("../utils/logJSON.js");
 
 exports.createOrderItems = async (
   user_id,
@@ -26,9 +27,8 @@ exports.createOrderItems = async (
   }
 
   const checkStaff = await customStaffQeury;
-
   if (checkStaff.length === 0) {
-    throw validateError("Staff ID", 404);
+    throw validateError("Staff ID not found or inactive", 404);
   }
 
   let orderQuery = db("orders")
@@ -41,8 +41,19 @@ exports.createOrderItems = async (
 
   const checkOrderQuery = await orderQuery;
   if (checkOrderQuery.length === 0) {
-    throw validateError("Order ID", 404);
+    throw validateError("Order ID not found", 404);
   }
 
-  console.log(checkOrderQuery);
+  if (!Array.isArray(data)) {
+    throw validateError("Data must be an array of items", 400);
+  }
+
+  const finalDataToInsert = data.map((item) => ({
+    order_id,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    price: item.price,
+  }));
+
+  await db("order_items").insert(finalDataToInsert);
 };
