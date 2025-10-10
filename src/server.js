@@ -2,6 +2,7 @@ const path = require("path");
 const fastify = require("fastify")({ logger: false });
 const knex = require("./config/knex.js");
 require("dotenv").config();
+const API_KEY = process.env.API_KEY;
 
 const userRoutes = require("./routes/user.route.js");
 const levelsRoutes = require("./routes/levels.route.js");
@@ -11,7 +12,8 @@ const productRoutes = require("./routes/product.route.js");
 const customerRoutes = require("./routes/customer.route.js");
 const orderRoutes = require("./routes/order.route.js");
 const uploadRoutes = require("./routes/upload.route.js");
-const orderItemRoutes = require("./routes/orderItems.route.js");
+const orderItemRoutes = require("./routes/items.route.js");
+const stockLogRoutes = require("./routes/stocklog.route.js");
 
 fastify.register(require("@fastify/multipart"));
 
@@ -30,27 +32,9 @@ fastify.register(customerRoutes, { prefix });
 fastify.register(orderRoutes, { prefix });
 fastify.register(uploadRoutes, { prefix });
 fastify.register(orderItemRoutes, { prefix });
+fastify.register(stockLogRoutes, { prefix });
 
 const start = async () => {
-  const products = [
-    { id: 1, name: "Laptop", price: 1000 },
-    { id: 2, name: "Phone", price: 500 },
-    { id: 3, name: "Tablet", price: 300 },
-  ];
-
-  // const productNames = products.map((product) => product.name);
-  // console.log("Product Names:", productNames);
-
-  const discountedProduct = products.map((products) => {
-    return products.price + 10;
-    // return {
-    //   ...products,
-    //   discout: products.price * 0.1,
-    // };
-  });
-
-  console.log("Hello discount", discountedProduct);
-
   try {
     fastify.listen({ port: process.env.PORT || 3000 });
     console.log(

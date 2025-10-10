@@ -1,12 +1,7 @@
 const db = require("../config/knex.js");
+const permission = require("../utils/permission.js");
 const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
-
-const permission = {
-  admin: "admin",
-  inventory: "inventory_mananger",
-  sale_person: "sale_person",
-};
 
 exports.getAllProduct = async (
   user_id,

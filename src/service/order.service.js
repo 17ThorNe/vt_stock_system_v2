@@ -4,10 +4,10 @@ const validateError = require("../utils/validateError.js");
 const permission = require("../utils/permission.js");
 const statusCodePermission = require("../utils/statusCodePermission.js");
 
-exports.createOrder = async (user_id, orders, permissionRole) => {
+exports.createOrder = async (user_id, orders, role) => {
   await userIdValidate(user_id);
 
-  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+  if (![permission.admin, permission.sale_person].includes(role)) {
     throw validateError("No have permission", 403);
   }
 
@@ -27,7 +27,7 @@ exports.createOrder = async (user_id, orders, permissionRole) => {
       is_deleted: false,
     });
 
-    if (permissionRole === permission.sale_person) {
+    if (role === permission.sale_person) {
       customerQuery.andWhere({ sale_person: saleId });
     }
 
@@ -47,7 +47,7 @@ exports.createOrder = async (user_id, orders, permissionRole) => {
 exports.getAllOrder = async (
   user_id,
   sale_person,
-  permissionRole,
+  role,
   page = 1,
   limit = 10
 ) => {
@@ -57,7 +57,7 @@ exports.getAllOrder = async (
       permission.inventory,
       permission.sale_person,
       permission.finance,
-    ].includes(permissionRole)
+    ].includes(role)
   ) {
     throw validateError("No permission to view orders", 403);
   }
@@ -68,7 +68,7 @@ exports.getAllOrder = async (
 
   let query = db("orders").where({ user_id, is_deleted: false });
 
-  if (permissionRole === permission.sale_person) {
+  if (role === permission.sale_person) {
     query = query.andWhere({ sale_person });
   }
 
@@ -91,20 +91,15 @@ exports.getAllOrder = async (
   };
 };
 
-exports.getOrderById = async (
-  user_id,
-  sale_person,
-  order_id,
-  permissionRole
-) => {
+exports.getOrderById = async (user_id, sale_person, order_id, role) => {
   if (
     ![permission.admin, permission.inventory, permission.sale_person].includes(
-      permissionRole
+      role
     )
   ) {
     throw validateError("No have permission", 403);
   }
-  if (permissionRole === permission.sale_person) {
+  if (role === permission.sale_person) {
     await userIdValidate(user_id);
     const result = await db("orders")
       .select("*")
@@ -132,10 +127,10 @@ exports.updateOrder = async (
   user_id,
   sale_person,
   order_id,
-  permissionRole,
+  role,
   dataUpdate
 ) => {
-  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+  if (![permission.admin, permission.sale_person].includes(role)) {
     throw validateError("No have permission", 403);
   }
   await userIdValidate(user_id);
@@ -162,10 +157,10 @@ exports.inventoryManagerApproveOrReject = async (
   user_id,
   inventoryManagerId,
   order_id,
-  permissionRole,
+  role,
   action
 ) => {
-  if (![permission.admin, permission.inventory].includes(permissionRole)) {
+  if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError(
       "No permission to approve/reject orders",
       statusCodePermission.noHavePermission
@@ -213,13 +208,8 @@ exports.inventoryManagerApproveOrReject = async (
     });
 };
 
-exports.deleteOrder = async (
-  user_id,
-  sale_person,
-  order_id,
-  permissionRole
-) => {
-  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+exports.deleteOrder = async (user_id, sale_person, order_id, role) => {
+  if (![permission.admin, permission.sale_person].includes(role)) {
     throw validateError("No have permission", 403);
   }
   await userIdValidate(user_id);
@@ -231,7 +221,7 @@ exports.deleteOrder = async (
     throw validateError("Sale person", 404);
   }
 
-  if (permissionRole === permission.admin) {
+  if (role === permission.admin) {
     const checkOrderId = await db("orders")
       .select("*")
       .where({ user_id, is_deleted: false, id: order_id });
@@ -239,7 +229,7 @@ exports.deleteOrder = async (
     if (checkOrderId.length === 0) {
       throw validateError("Order ID", 404);
     }
-  } else if (permissionRole === permission.sale_person) {
+  } else if (role === permission.sale_person) {
     const checkOrderId = await db("orders")
       .select("*")
       .where({ user_id, sale_person, is_deleted: false, id: order_id });
@@ -249,12 +239,12 @@ exports.deleteOrder = async (
     }
   }
 
-  if (permissionRole === permission.sale_person) {
+  if (role === permission.sale_person) {
     await db("orders")
       .select("*")
       .where({ user_id, sale_person, is_deleted: false, id: order_id })
       .update({ is_deleted: true });
-  } else if (permissionRole === permission.admin) {
+  } else if (role === permission.admin) {
     await db("orders")
       .select("*")
       .where({ user_id, is_deleted: false, id: order_id })
@@ -262,22 +252,17 @@ exports.deleteOrder = async (
   }
 };
 
-exports.postTestRole = async (user_id, sale_person, permissionRole, data) => {
+exports.postTestRole = async (user_id, sale_person, role, data) => {
   console.log("User ID: ", user_id);
   console.log("Sale Person: ", sale_person);
-  console.log("Permission role: ", permissionRole);
+  console.log("Permission role: ", role);
   console.log("Data to post:", data);
 };
 
-exports.financeApprovePayment = async (
-  user_id,
-  sale_person,
-  orderId,
-  permissionRole
-) => {
-  console.log("Data: ", user_id, sale_person, orderId, permissionRole);
+exports.financeApprovePayment = async (user_id, sale_person, orderId, role) => {
+  console.log("Data: ", user_id, sale_person, orderId, role);
 
-  if (![permission.admin, permission.finance].includes(permissionRole)) {
+  if (![permission.admin, permission.finance].includes(role)) {
     throw validateError("No have permission", 403);
   }
 
@@ -307,16 +292,11 @@ exports.financeApprovePayment = async (
     .update({ status: "READY_FOR_PAYMENT", finance_id: sale_person });
 };
 
-exports.deliveryApprove = async (
-  user_id,
-  staff_id,
-  order_id,
-  permissionRole
-) => {
-  console.log("User data: ", user_id, staff_id, order_id, permissionRole);
+exports.deliveryApprove = async (user_id, staff_id, order_id, role) => {
+  console.log("User data: ", user_id, staff_id, order_id, role);
   await userIdValidate(user_id);
 
-  if (![permission.admin, permission.delivery].includes(permissionRole)) {
+  if (![permission.admin, permission.delivery].includes(role)) {
     throw validateError(
       "No have permission",
       statusCodePermission.noHavePermission

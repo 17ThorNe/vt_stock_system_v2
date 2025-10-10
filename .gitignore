@@ -1,0 +1,15 @@
+# Node.js
+node_modules/
+.env
+.env.local
+.env.development
+.env.production
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# IDEs
+.vscode/
+.idea/

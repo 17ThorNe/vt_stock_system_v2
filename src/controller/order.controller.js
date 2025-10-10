@@ -4,7 +4,7 @@ const permission = require("../utils/permission.js");
 
 exports.createOrder = async (request, reply) => {
   try {
-    const { user_id, sale_id, role } = request.user;
+    const { user_id, staff_id, role } = request.user;
     let orders = request.body;
 
     if (!Array.isArray(orders)) {
@@ -20,7 +20,7 @@ exports.createOrder = async (request, reply) => {
         }
         finalSaleId = order.sale_person;
       } else if (role === permission.sale_person) {
-        finalSaleId = sale_id;
+        finalSaleId = staff_id;
       } else {
         throw validateError("No have permission", 403);
       }
@@ -43,12 +43,12 @@ exports.createOrder = async (request, reply) => {
 
 exports.getAllOrders = async (request, reply) => {
   try {
-    const { user_id, sale_id, role } = request.user;
+    const { user_id, staff_id, role } = request.user;
     const { page = 1, limit = 10 } = request.query;
 
     const result = await orderService.getAllOrder(
       user_id,
-      sale_id,
+      staff_id,
       role,
       Number(page),
       Number(limit)
@@ -70,23 +70,23 @@ exports.getAllOrders = async (request, reply) => {
 };
 
 exports.getOrderById = async (request, reply) => {
-  const { user_id, sale_id, role } = request.user;
+  const { user_id, staff_id, role } = request.user;
   const id = request.params.id;
   await handleController(request, reply, orderService.getOrderById, [
     user_id,
-    sale_id,
+    staff_id,
     id,
     role,
   ]);
 };
 
 exports.updateOrder = async (request, reply) => {
-  const { user_id, sale_id, role } = request.user;
+  const { user_id, staff_id, role } = request.user;
   const id = request.params.id;
   const dataUpdate = request.body;
   await handleController(request, reply, orderService.updateOrder, [
     user_id,
-    sale_id,
+    staff_id,
     id,
     role,
     dataUpdate,
@@ -94,7 +94,7 @@ exports.updateOrder = async (request, reply) => {
 };
 
 exports.inventoryManagerApproveOrReject = async (request, reply) => {
-  const { user_id, role, sale_id: tokenStaffID } = request.user;
+  const { user_id, role, staff_id: tokenStaffID } = request.user;
   const id = request.params.id;
   const { action, staff_id } = request.body;
 
@@ -114,25 +114,25 @@ exports.inventoryManagerApproveOrReject = async (request, reply) => {
 };
 
 exports.deleteOrder = async (request, reply) => {
-  const { user_id, role, sale_id } = request.user;
+  const { user_id, role, staff_id } = request.user;
   const id = request.params.id;
   await handleController(request, reply, orderService.deleteOrder, [
     user_id,
-    sale_id,
+    staff_id,
     id,
     role,
   ]);
 };
 
 exports.postTestRole = async (request, reply) => {
-  const { user_id, role, sale_id } = request.user;
+  const { user_id, role, staff_id } = request.user;
   const data = request.body;
 
   let supportSaleId;
   if (role === permission.admin) {
     supportSaleId = data.sale_person_id;
   } else if (role === permission.sale_person) {
-    supportSaleId = sale_id;
+    supportSaleId = staff_id;
   }
 
   if (!supportSaleId) {
@@ -150,7 +150,7 @@ exports.postTestRole = async (request, reply) => {
 };
 
 exports.financeApprovePayment = async (request, reply) => {
-  const { user_id, role, sale_id: tokenStaffId } = request.user;
+  const { user_id, role, staff_id: tokenStaffId } = request.user;
   const id = request.params.id;
   const data = request.body;
 
@@ -170,7 +170,7 @@ exports.financeApprovePayment = async (request, reply) => {
 };
 
 exports.deliveryApprove = async (request, reply) => {
-  const { user_id, sale_id: tokenStaffId, role } = request.user;
+  const { user_id, staff_id: tokenStaffId, role } = request.user;
   const id = request.params.id;
   const { staff_id } = request.body;
 

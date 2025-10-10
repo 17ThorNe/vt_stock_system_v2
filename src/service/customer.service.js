@@ -4,7 +4,7 @@ const statusCodePermission = require("../utils/statusCodePermission.js");
 const userIdValidate = require("../utils/userIdValidate.js");
 const validateError = require("../utils/validateError.js");
 
-exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
+exports.createCustomer = async (user_id, staff_id, permissinRole, data) => {
   await userIdValidate(user_id);
   const salePersons = await db("staff").where({
     user_id: user_id,
@@ -24,7 +24,7 @@ exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
     const finalDataToInsert = {
       ...data,
       user_id: user_id,
-      sale_person: sale_id,
+      sale_person: staff_id,
     };
 
     console.table(finalDataToInsert);
@@ -37,24 +37,24 @@ exports.createCustomer = async (user_id, sale_id, permissinRole, data) => {
   }
 };
 
-exports.getAllCustomer = async (user_id, sale_id, permissionRole) => {
+exports.getAllCustomer = async (user_id, staff_id, role) => {
   await userIdValidate(user_id);
 
-  if (permissionRole === permission.admin) {
+  if (role === permission.admin) {
     return await db("customers")
       .select("*")
       .where({ user_id: user_id, is_deleted: false });
   }
 
-  if (permissionRole === permission.sale_person) {
-    if (!sale_id) {
+  if (role === permission.sale_person) {
+    if (!staff_id) {
       const error = new Error("Sale person ID is required!");
       error.statusCode = 400;
       throw error;
     }
     return await db("customers")
       .select("*")
-      .where({ user_id: user_id, sale_person: sale_id, is_deleted: false });
+      .where({ user_id: user_id, sale_person: staff_id, is_deleted: false });
   }
 
   const error = new Error("You can't view customer");
@@ -62,17 +62,14 @@ exports.getAllCustomer = async (user_id, sale_id, permissionRole) => {
   throw error;
 };
 
-exports.getCustomerById = async (user_id, sale_id, id, permissionRole) => {
+exports.getCustomerById = async (user_id, staff_id, id, role) => {
   await userIdValidate(user_id);
 
-  if (
-    permissionRole !== permission.admin &&
-    permissionRole !== permission.sale_person
-  ) {
+  if (role !== permission.admin && role !== permission.sale_person) {
     throw validateError("You no have permission", 403);
   }
 
-  if (permissionRole === permission.admin) {
+  if (role === permission.admin) {
     const result = await db("customers")
       .select("*")
       .where({ user_id: user_id, is_deleted: false, id: id })
@@ -80,10 +77,10 @@ exports.getCustomerById = async (user_id, sale_id, id, permissionRole) => {
     return result;
   }
 
-  if (permissionRole === permission.sale_person) {
+  if (role === permission.sale_person) {
     const result = await db("customers")
       .select("*")
-      .where({ user_id: user_id, sale_person: sale_id, id: id })
+      .where({ user_id: user_id, sale_person: staff_id, id: id })
       .first();
     if (!result) {
       throw validateError("Customer", 404);
@@ -204,13 +201,8 @@ exports.updateCustomer = async (
   }
 };
 
-exports.deleteCustomer = async (
-  user_id,
-  staff_id,
-  customer_id,
-  permissionRole
-) => {
-  if (![permission.admin, permission.sale_person].includes(permissionRole)) {
+exports.deleteCustomer = async (user_id, staff_id, customer_id, role) => {
+  if (![permission.admin, permission.sale_person].includes(role)) {
     throw validateError(
       "No have permission",
       statusCodePermission.noHavePermission
@@ -239,7 +231,7 @@ exports.deleteCustomer = async (
     is_deleted: false,
   });
 
-  if (permissionRole === permission.sale_person) {
+  if (role === permission.sale_person) {
     customerQuery.andWhere({ sale_person: staff_id });
   }
 

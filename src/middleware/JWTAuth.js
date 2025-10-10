@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const validateError = require("../utils/validateError");
 require("dotenv").config();
 const SECRET_KEY = process.env.JWT_SECRET;
 
@@ -6,18 +7,18 @@ async function JWTAuth(request, reply) {
   try {
     const authHeader = request.headers["authorization"];
     if (!authHeader) {
-      return reply.code(401).send({ error: "No token provided" });
+      throw validateError("No token provided", 401);
     }
 
     const token = authHeader.split(" ")[1];
     if (!token) {
-      return reply.code(401).send({ error: "Token missing" });
+      throw validateError("Token missing", 401);
     }
 
     const decoded = jwt.verify(token, SECRET_KEY);
     request.user = decoded;
   } catch (err) {
-    return reply.code(403).send({ error: "Invalid or expired token" });
+    throw validateError("Invalid or expired token", 403);
   }
 }
 

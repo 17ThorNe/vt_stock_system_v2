@@ -124,17 +124,21 @@ exports.loginService = async (email, password) => {
       directionPermission = "delivery";
     }
 
-    const token = jwt.sign(
-      { sale_id: staff.id, user_id: staff.user_id, role: directionPermission },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
-
-    return {
-      token,
-      sale_id: staff.id,
+    // Create JWT payload (only include staff_id if not admin)
+    const payload = {
       user_id: staff.user_id,
       role: directionPermission,
+      ...(directionPermission !== "admin" && { staff_id: staff.id }),
+    };
+
+    const token = jwt.sign(payload, SECRET_KEY, { expiresIn: "1h" });
+
+    // Return data (same logic)
+    return {
+      token,
+      user_id: staff.user_id,
+      role: directionPermission,
+      ...(directionPermission !== "admin" && { staff_id: staff.id }),
     };
   }
 
