@@ -1,4 +1,3 @@
-const { data } = require("react-router-dom");
 const db = require("../config/knex.js");
 
 exports.getAllLevels = async () => {

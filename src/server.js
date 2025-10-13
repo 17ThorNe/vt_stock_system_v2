@@ -36,7 +36,10 @@ fastify.register(stockLogRoutes, { prefix });
 
 const start = async () => {
   try {
-    fastify.listen({ port: process.env.PORT || 3000 });
+    await fastify.listen({
+      port: process.env.PORT || 3000,
+      host: "0.0.0.0", // <-- add this line
+    });
     console.log(
       `🚀 Server running at http://localhost:${process.env.PORT || 3000}`
     );
