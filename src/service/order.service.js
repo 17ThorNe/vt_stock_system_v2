@@ -1,8 +1,9 @@
 const db = require("../config/knex.js");
 const userIdValidate = require("../utils/userIdValidate.js");
-const validateError = require("../utils/validateError.js");
 const permission = require("../utils/permission.js");
 const statusCodePermission = require("../utils/statusCodePermission.js");
+const validateError = require("../utils/validateError.js");
+const printf = require("../utils/printf.utils.js");
 
 exports.createOrder = async (user_id, orders, role) => {
   await userIdValidate(user_id);
@@ -160,52 +161,84 @@ exports.inventoryManagerApproveOrReject = async (
   role,
   action
 ) => {
+  // 1️⃣ Check permission
   if (![permission.admin, permission.inventory].includes(role)) {
-    throw validateError(
-      "No permission to approve/reject orders",
-      statusCodePermission.noHavePermission
-    );
+    throw validateError("No permission to approve or reject orders", 403);
   }
+
   await userIdValidate(user_id);
 
-  const checkStaffId = await db("staff").select("*").where({
-    user_id,
-    id: inventoryManagerId,
-    permission_lvl: 2,
-    status: "active",
-  });
-  if (checkStaffId.length === 0) {
-    throw validateError("Staff ID", statusCodePermission.notFoundPermiision);
-  }
-  const checkOrderId = await db("orders")
-    .select("*")
-    .where({ user_id, id: order_id, is_deleted: false });
-
-  if (checkOrderId.length === 0) {
-    throw validateError("Order ID", statusCodePermission.notFoundPermiision);
-  }
-
-  let actionTestApproveOrReject;
-  if (action === "approve") {
-    actionTestApproveOrReject = "APPROVED_BY_INVENTORY";
-  } else if (action === "reject") {
-    actionTestApproveOrReject = "REJECTED_BY_INVENTORY";
-  } else {
-    throw validateError("Status tupe", statusCodePermission.notFoundPermiision);
-  }
-  console.log(`Hello action: ${actionTestApproveOrReject}`);
-
-  await db("orders")
-    .select("*")
+  // 2️⃣ Check inventory manager exists
+  const staff = await db("staff")
     .where({
       user_id,
-      id: order_id,
-      is_deleted: false,
+      id: inventoryManagerId,
+      permission_lvl: 2,
+      status: "active",
     })
-    .update({
-      inventory_manager_id: inventoryManagerId,
-      status: actionTestApproveOrReject,
-    });
+    .first();
+  if (!staff) throw validateError("Inventory Manager not found", 404);
+
+  // 3️⃣ Check order exists and is pending
+  const order = await db("orders")
+    .where({ user_id, id: order_id, is_deleted: false })
+    .first();
+  if (!order) throw validateError("Order not found", 404);
+  if (order.status !== "PENDING_APPROVAL")
+    throw validateError("Order already processed", 400);
+
+  // 4️⃣ Determine new status
+  let newStatus;
+  if (action === "approve") newStatus = "APPROVED_BY_INVENTORY";
+  else if (action === "reject") newStatus = "REJECTED_BY_INVENTORY";
+  else throw validateError("Invalid action type", 400);
+
+  // 5️⃣ Update order status
+  await db("orders").where({ id: order_id }).update({
+    status: newStatus,
+    inventory_manager_id: inventoryManagerId,
+    updated_at: db.fn.now(),
+  });
+
+  // 6️⃣ If approved, update stock & create stock logs
+  if (newStatus === "APPROVED_BY_INVENTORY") {
+    const orderItems = await db("order_items").where({ order_id, user_id });
+
+    for (const item of orderItems) {
+      const { product_id, quantity } = item;
+
+      const product = await db("products")
+        .where({ id: product_id, user_id })
+        .first();
+
+      if (!product)
+        throw validateError(`Product ID ${product_id} not found`, 404);
+
+      const previousQty = product.quantity;
+      const newQty = previousQty - quantity;
+
+      if (newQty < 0)
+        throw validateError(`Not enough stock for product ${product_id}`, 400);
+
+      // Update product quantity
+      await db("products")
+        .where({ id: product_id, user_id })
+        .update({ quantity: newQty });
+
+      // Insert stock log
+      await db("stocklogs").insert({
+        user_id,
+        staff_id: inventoryManagerId,
+        product_id,
+        order_id,
+        stock_type: "out",
+        p_stock: previousQty,
+        n_stock: newQty,
+        quantity,
+        note: "Stock out after order approval",
+      });
+    }
+  }
 };
 
 exports.deleteOrder = async (user_id, sale_person, order_id, role) => {
@@ -323,4 +356,22 @@ exports.deliveryApprove = async (user_id, staff_id, order_id, role) => {
     .select("*")
     .where({ user_id, id: order_id, is_deleted: false })
     .update({ delivery_id: staff_id, status: "DELIVERED" });
+};
+
+exports.financeGetOrderApproved = async (userId, role) => {
+  if (![permission.admin, permission.finance].includes(role)) {
+    throw validateError("No have permission", 403);
+  }
+
+  await userIdValidate(userId);
+
+  const resultGetOrder = await db("orders")
+    .select("*")
+    .where({
+      user_id: userId,
+      is_deleted: false,
+      status: "APPROVED_BY_INVENTORY",
+    });
+
+  return resultGetOrder;
 };

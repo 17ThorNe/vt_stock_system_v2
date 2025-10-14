@@ -14,6 +14,8 @@ const orderRoutes = require("./routes/order.route.js");
 const uploadRoutes = require("./routes/upload.route.js");
 const orderItemRoutes = require("./routes/items.route.js");
 const stockLogRoutes = require("./routes/stocklog.route.js");
+const testRoutes = require("./test/test.route.js");
+const supplierRoutes = require("./routes/supplier.route.js");
 
 fastify.register(require("@fastify/multipart"));
 
@@ -33,6 +35,8 @@ fastify.register(orderRoutes, { prefix });
 fastify.register(uploadRoutes, { prefix });
 fastify.register(orderItemRoutes, { prefix });
 fastify.register(stockLogRoutes, { prefix });
+fastify.register(testRoutes, { prefix });
+fastify.register(supplierRoutes, { prefix });
 
 const start = async () => {
   try {

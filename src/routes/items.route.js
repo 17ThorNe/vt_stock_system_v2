@@ -20,22 +20,22 @@ async function orderItemRoutes(fastify, option) {
   );
   fastify.get(
     "/get-order-item-staff/:staff_id",
-    { preHandler: [JWTAuth] },
+    { preHandler: [verifyApiKey, JWTAuth] },
     itemsController.getItemByStaffId
   );
   fastify.get(
     "/get-order-item-orderid/:id",
-    { preHandler: [JWTAuth] },
+    { preHandler: [verifyApiKey, JWTAuth] },
     itemsController.getItemByOrderId
   );
   fastify.put(
     "/update-order-item/:id",
-    { preHandler: [JWTAuth] },
+    { preHandler: [verifyApiKey, JWTAuth] },
     itemsController.updateItems
   );
   fastify.put(
     "/delete-order-item/:id",
-    { preHandler: [JWTAuth] },
+    { preHandler: [verifyApiKey, JWTAuth] },
     itemsController.deleteItem
   );
 }

@@ -50,9 +50,6 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
     quantity: item.quantity,
     price: item.price,
   }));
-
-  logJSON("Data to insert:", finalDataToInsert);
-
   await db("order_items").insert(finalDataToInsert);
 };
 

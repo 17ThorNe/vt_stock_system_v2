@@ -1,5 +1,6 @@
 const levelsController = require("../controller/levels.controller");
 const { JWTAuth } = require("../middleware/JWTAuth.js");
+const verifyApiKey = require("../middleware/apiKeyVerify.auth.js");
 
 async function routes(fastify, option) {
   fastify.get("/get/levels", levelsController.getLevels);

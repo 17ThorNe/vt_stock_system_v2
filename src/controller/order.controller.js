@@ -1,6 +1,7 @@
 const orderService = require("../service/order.service.js");
 const { handleController } = require("../utils/dbHelper.js");
 const permission = require("../utils/permission.js");
+const validateError = require("../utils/validateError.js");
 
 exports.createOrder = async (request, reply) => {
   try {
@@ -180,11 +181,18 @@ exports.deliveryApprove = async (request, reply) => {
   } else if (role === permission.delivery) {
     finalStaffId = tokenStaffId;
   }
-  console.log(`Hello final staff id : `, finalStaffId);
   await handleController(request, reply, orderService.deliveryApprove, [
     user_id,
     finalStaffId,
     id,
+    role,
+  ]);
+};
+
+exports.financeGetOrderApproved = async (request, reply) => {
+  const { user_id, staff_id, role } = request.user;
+  await handleController(request, reply, orderService.financeGetOrderApproved, [
+    user_id,
     role,
   ]);
 };
