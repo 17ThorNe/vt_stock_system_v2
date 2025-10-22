@@ -4,7 +4,11 @@ const permission = require("../utils/permission.js");
 const validateError = require("../utils/validateError.js");
 
 exports.getAllStockLog = async (request, reply) => {
-  await handleController(request, reply, stockLogService.getAllStockLog, []);
+  const { user_id, role } = request.user;
+  await handleController(request, reply, stockLogService.getAllStockLog, [
+    user_id,
+    role,
+  ]);
 };
 
 exports.importStock = async (request, reply) => {

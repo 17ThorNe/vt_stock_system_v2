@@ -13,6 +13,21 @@ async function supplierRoutes(fastify, option) {
     { preHandler: [verifyApiKey, JWTAuth] },
     supplierController.getAllSupplier
   );
+  fastify.get(
+    "/get-supplier/:id",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    supplierController.getSupplierById
+  );
+  fastify.put(
+    "/update-supplier/:id",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    supplierController.updateSupplier
+  );
+  fastify.put(
+    "/delete-supplier/:id",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    supplierController.deleteSupplier
+  );
 }
 
 module.exports = supplierRoutes;

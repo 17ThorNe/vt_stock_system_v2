@@ -5,12 +5,31 @@ const permission = require("../utils/permission.js");
 const printf = require("../utils/printf.utils.js");
 const logJSON = require("../utils/logJSON.js");
 
-exports.getAllStockLog = async (userId, staffId, role) => {
-  printf("Here Get All StockLogs");
+exports.getAllStockLog = async (userId, role) => {
+  if (![permission.admin, permission.inventory].includes(role)) {
+    throw validateError("No have permiss", 403);
+  }
+
+  await userIdValidate(userId);
+
+  const result = await db("stocklogs").select("*").where({ user_id: userId });
+
+  if (result.length === 0) {
+    throw validateError("Data is empty", 400);
+  }
+
+  return result;
 };
 
 exports.importStock = async (user_id, staff_id, role, data) => {
-  const { product_id, order_id, stock_type = "in", quantity, note } = data;
+  const {
+    product_id,
+    order_id,
+    supplier_id,
+    stock_type = "in",
+    quantity,
+    note,
+  } = data;
 
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No have permission", 403);
@@ -66,11 +85,21 @@ exports.importStock = async (user_id, staff_id, role, data) => {
     updateTotalQuantity = previousQty - quantity;
   }
 
+  const isSupplierId = await db("supplier")
+    .select("*")
+    .where({ user_id, id: supplier_id, status: "active" })
+    .first();
+
+  if (!isSupplierId) {
+    throw validateError("Supplier ID", 404);
+  }
+
   const finalInsertData = {
     user_id,
     staff_id,
     order_id,
     product_id,
+    supplier_id,
     stock_type,
     quantity,
     p_stock: previousQty,
@@ -84,6 +113,4 @@ exports.importStock = async (user_id, staff_id, role, data) => {
     .where({ user_id, id: product_id, is_deleted: false });
 
   await db("stocklogs").insert(finalInsertData);
-
-  return updateTotalQuantity;
 };

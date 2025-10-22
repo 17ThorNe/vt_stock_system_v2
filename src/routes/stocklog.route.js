@@ -9,7 +9,7 @@ async function stockLogRoutes(fastify, option) {
     stockLogController.getAllStockLog
   );
   fastify.post(
-    "/create-stocklog",
+    "/import-stocklog",
     { preHandler: [verifyApiKey, JWTAuth] },
     stockLogController.importStock
   );

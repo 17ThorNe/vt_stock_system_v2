@@ -28,3 +28,45 @@ exports.getAllSupplier = async (request, reply) => {
     role,
   ]);
 };
+
+exports.getSupplierById = async (request, reply) => {
+  const { user_id, role } = request.user;
+  const id = request.params.id;
+  await handleController(request, reply, supplierService.getSupplierById, [
+    user_id,
+    id,
+    role,
+  ]);
+};
+
+exports.updateSupplier = async (request, reply) => {
+  const { user_id, staff_id: tokenStaffId, role } = request.user;
+  const id = request.params.id;
+  const data = request.body;
+
+  let finalStaffId;
+
+  if (role === permission.admin) {
+    finalStaffId = data.staff_id;
+  } else if (role === permission.inventory) {
+    finalStaffId = tokenStaffId;
+  }
+
+  await handleController(request, reply, supplierService.updateSupplier, [
+    user_id,
+    id,
+    finalStaffId,
+    role,
+    data,
+  ]);
+};
+
+exports.deleteSupplier = async (request, reply) => {
+  const { user_id, role } = request.user;
+  const id = request.params.id;
+  await handleController(request, reply, supplierService.deleteSupplier, [
+    user_id,
+    id,
+    role,
+  ]);
+};
