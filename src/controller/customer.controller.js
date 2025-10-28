@@ -25,6 +25,7 @@ exports.createCustomer = async (request, reply) => {
 exports.getAllCustomer = async (request, reply) => {
   const { user_id, role } = request.user;
   const { staff_id } = request.user;
+  const token = request.cookies.token;
   await handleController(request, reply, customerService.getAllCustomer, [
     user_id,
     staff_id,

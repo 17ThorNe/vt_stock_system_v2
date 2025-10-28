@@ -84,24 +84,6 @@ exports.loginService = async (email, password) => {
     throw error;
   }
 
-  const user = await db("users").where({ email }).first();
-  if (user) {
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      const error = new Error("Invalid email or password");
-      error.statusCode = 401;
-      throw error;
-    }
-
-    const token = jwt.sign(
-      { id: user.id, user_id: user.id, role: "super_admin" },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
-
-    return { token, user_id: user.id, role: "super_admin" };
-  }
-
   const staff = await db("staff").where({ email }).first();
   if (staff) {
     const isMatch = await bcrypt.compare(password, staff.password);
@@ -111,40 +93,40 @@ exports.loginService = async (email, password) => {
       throw error;
     }
 
-    let directionPermission;
-    if (staff.permission_lvl === 1) {
-      directionPermission = "admin";
-    } else if (staff.permission_lvl === 2) {
-      directionPermission = "inventory_manager";
-    } else if (staff.permission_lvl === 3) {
-      directionPermission = "sale_person";
-    } else if (staff.permission_lvl === 4) {
-      directionPermission = "finance";
-    } else if (staff.permission_lvl === 5) {
-      directionPermission = "delivery";
-    }
+    const map = {
+      1: "admin",
+      2: "inventory_manager",
+      3: "sale_person",
+      4: "finance",
+      5: "delivery",
+    };
+    const role = map[staff.permission_lvl] || "staff";
 
-    // Create JWT payload (only include staff_id if not admin)
     const payload = {
       user_id: staff.user_id,
-      role: directionPermission,
-      ...(directionPermission !== "admin" && { staff_id: staff.id }),
+      staff_id: staff.id,
+      role,
     };
 
     const token = jwt.sign(payload, SECRET_KEY, { expiresIn: "1h" });
-
-    // Return data (same logic)
-    return {
-      token,
-      user_id: staff.user_id,
-      role: directionPermission,
-      ...(directionPermission !== "admin" && { staff_id: staff.id }),
-    };
+    return { payload, token };
   }
 
-  const error = new Error("Invalid email or password");
-  error.statusCode = 401;
-  throw error;
+  const user = await db("users").where({ email }).first();
+  if (user) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      const error = new Error("Invalid email or password");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const payload = { user_id: user.id, role: "super_admin" };
+    const token = jwt.sign(payload, SECRET_KEY, { expiresIn: "1h" });
+    return { payload, token };
+  }
+
+  throw new Error("Invalid email or password");
 };
 
 exports.inActiveAccount = async (id, currentUserLevel) => {
@@ -162,4 +144,47 @@ exports.inActiveAccount = async (id, currentUserLevel) => {
   }
 
   await db("users").where({ id }).update({ status: "inactive" });
+};
+
+exports.getCurrentUser = async ({ user_id, staff_id }) => {
+  if (staff_id) {
+    const staff = await db("staff").where({ id: staff_id }).first();
+    if (!staff) throw new Error("Staff not found");
+
+    let role;
+    switch (staff.permission_lvl) {
+      case 1:
+        role = "admin";
+        break;
+      case 2:
+        role = "inventory_manager";
+        break;
+      case 3:
+        role = "sale_person";
+        break;
+      case 4:
+        role = "finance";
+        break;
+      case 5:
+        role = "delivery";
+        break;
+      default:
+        role = "staff";
+    }
+
+    return {
+      user_id: staff.user_id,
+      staff_id: staff.id,
+      role,
+    };
+  }
+
+  if (user_id) {
+    const user = await db("users").where({ id: user_id }).first();
+    if (!user) throw new Error("User not found");
+
+    return { user_id: user.id, role: "super_admin" };
+  }
+
+  throw new Error("User not found");
 };

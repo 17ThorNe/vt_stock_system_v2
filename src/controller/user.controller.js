@@ -18,10 +18,28 @@ exports.createUser = async (request, reply) => {
 
 exports.login = async (request, reply) => {
   const { email, password } = request.body;
-  await handleController(request, reply, userService.loginService, [
-    email,
-    password,
-  ]);
+
+  try {
+    const { payload, token } = await userService.loginService(email, password);
+
+    // Set HttpOnly cookie
+    reply
+      .setCookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Strict",
+        path: "/",
+        maxAge: 3600, // 1 hour
+      })
+      .send({
+        status: "success",
+        data: payload,
+      });
+  } catch (err) {
+    reply
+      .status(err.statusCode || 500)
+      .send({ status: "error", message: err.message });
+  }
 };
 
 exports.inactiveAccount = async (request, reply) => {
@@ -31,4 +49,15 @@ exports.inactiveAccount = async (request, reply) => {
     id,
     currentUserLevel,
   ]);
+};
+
+exports.getMe = async (request, reply) => {
+  try {
+    const { user_id, staff_id } = request.user;
+    const data = await userService.getCurrentUser({ user_id, staff_id });
+
+    return reply.send({ status: "success", data });
+  } catch (err) {
+    return reply.status(404).send({ status: "error", message: err.message });
+  }
 };

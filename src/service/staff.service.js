@@ -89,6 +89,7 @@ exports.getAllStaff = async (user_id, permissinRole) => {
 };
 
 exports.getStaffById = async (id, user_id) => {
+  console.log(user_id);
   const checkUserid = await db("users").where({ id: user_id }).first();
   if (!checkUserid) {
     const error = new Error("User ID not found!");
@@ -102,6 +103,7 @@ exports.getStaffById = async (id, user_id) => {
     error.statusCode = 404;
     throw error;
   }
+  console.log(staff);
   return staff;
 };
 

@@ -13,7 +13,7 @@ exports.createStaff = async (request, reply) => {
 };
 
 exports.getAllStaff = async (request, reply) => {
-  const user_id = request.user.id;
+  const user_id = request.user.user_id;
   const { role } = request.user;
   await handleController(request, reply, staffService.getAllStaff, [
     user_id,
@@ -23,7 +23,8 @@ exports.getAllStaff = async (request, reply) => {
 
 exports.getStaffById = async (request, reply) => {
   const id = request.params.id;
-  const user_id = request.user.id;
+  const user_id = request.user.user_id;
+  console.log(user_id);
   await handleController(request, reply, staffService.getStaffById, [
     id,
     user_id,

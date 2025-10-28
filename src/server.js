@@ -1,8 +1,10 @@
+const cors = require("@fastify/cors");
 const path = require("path");
-const fastify = require("fastify")({ logger: false });
+const fastify = require("fastify")({ logger: true });
 const knex = require("./config/knex.js");
 require("dotenv").config();
 const API_KEY = process.env.API_KEY;
+const fastifyCookie = require("fastify-cookie");
 
 const userRoutes = require("./routes/user.route.js");
 const levelsRoutes = require("./routes/levels.route.js");
@@ -17,7 +19,17 @@ const stockLogRoutes = require("./routes/stocklog.route.js");
 const testRoutes = require("./test/test.route.js");
 const supplierRoutes = require("./routes/supplier.route.js");
 
+fastify.register(fastifyCookie, {
+  secret: process.env.COOKIE_SECRET || "supersecret",
+  parseOptions: {},
+});
+
 fastify.register(require("@fastify/multipart"));
+fastify.register(cors, {
+  origin: "http://localhost:5000", // your frontend
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true, // if you use cookies/auth headers
+});
 
 fastify.register(require("@fastify/static"), {
   root: path.join(__dirname, "uploads"),

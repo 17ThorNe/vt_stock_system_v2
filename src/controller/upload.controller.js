@@ -2,8 +2,7 @@ const uploadService = require("../service/upload.service.js");
 
 exports.uploadImage = async (request, reply) => {
   try {
-    // Use Fastify's multipart method
-    const file = await request.file(); // get uploaded file stream
+    const file = await request.file();
     const result = await uploadService.saveImage(file);
 
     reply.send({
