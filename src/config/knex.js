@@ -1,23 +1,12 @@
 const knex = require("knex")({
   client: "mysql2",
   connection: {
-    host: "localhost",
-    // host: "host.docker.internal",
+    host: "127.0.0.1",
     user: "root",
-    password: "",
-    database: "stock_database",
+    password: "@#$Mysql151100&!",
+    database: "vertex_stock_database",
   },
   pool: { min: 0, max: 10 },
 });
-
-async function validateConnection() {
-  try {
-    await knex.raw("SELECT 1+1 AS result");
-  } catch (error) {
-    process.exit(1);
-  }
-}
-
-validateConnection();
 
 module.exports = knex;

@@ -2,7 +2,7 @@ const { handleController } = require("../utils/dbHelper.js");
 const staffService = require("../service/staff.service.js");
 
 exports.createStaff = async (request, reply) => {
-  const user_id = request.user.id;
+  const user_id = request.user.user_id;
   const { role } = request.user;
   const staffData = request.body;
   await handleController(request, reply, staffService.createStaff, [

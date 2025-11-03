@@ -26,9 +26,9 @@ fastify.register(fastifyCookie, {
 
 fastify.register(require("@fastify/multipart"));
 fastify.register(cors, {
-  origin: "http://localhost:5000", // your frontend
+  origin: "http://localhost:5000",
   methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true, // if you use cookies/auth headers
+  credentials: true,
 });
 
 fastify.register(require("@fastify/static"), {
@@ -54,7 +54,7 @@ const start = async () => {
   try {
     await fastify.listen({
       port: process.env.PORT || 3000,
-      host: "0.0.0.0", // <-- add this line
+      host: "0.0.0.0",
     });
     console.log(
       `🚀 Server running at http://localhost:${process.env.PORT || 3000}`

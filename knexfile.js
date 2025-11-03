@@ -5,9 +5,17 @@
  */
 module.exports = {
   development: {
-    client: "sqlite3",
+    client: "mysql2", // <-- Use mysql2 instead of sqlite3
     connection: {
-      filename: "./dev.sqlite3",
+      host: "127.0.0.1",
+      user: "root",
+      password: "@#$Mysql151100&!", // <-- Add your MySQL root password if any
+      database: "vertex_stock_database", // <-- Your database name
+    },
+    pool: { min: 0, max: 10 },
+    migrations: {
+      tableName: "knex_migrations", // <-- Keep track of migrations
+      directory: "./src/migration", // <-- Make sure your migration files are here
     },
   },
 

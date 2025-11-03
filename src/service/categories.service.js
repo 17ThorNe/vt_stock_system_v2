@@ -4,7 +4,7 @@ require("dotenv").config();
 
 const permission = {
   admin: "admin",
-  inventory: "inventory_mananger",
+  inventory: "inventory_manager",
   sale_person: "sale_person",
 };
 

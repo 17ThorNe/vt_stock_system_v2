@@ -9,7 +9,7 @@ async function routes(fastify, option) {
     userController.getUser
   );
   fastify.post("/create", userController.createUser);
-  fastify.post("/login", userController.login);
+  fastify.post("/auth/login", userController.login);
   fastify.get(
     "/user/:id",
     { preHandler: [verifyApiKey, JWTAuth] },
