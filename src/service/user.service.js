@@ -153,24 +153,26 @@ exports.getCurrentUser = async ({ user_id, staff_id }) => {
 
     let role;
     switch (staff.permission_lvl) {
-      case 1:
+      case "1":
         role = "admin";
         break;
-      case 2:
+      case "2":
         role = "inventory_manager";
         break;
-      case 3:
+      case "3":
         role = "sale_person";
         break;
-      case 4:
+      case "4":
         role = "finance";
         break;
-      case 5:
+      case "5":
         role = "delivery";
         break;
       default:
         role = "staff";
     }
+
+    console.log("Hello role", role);
 
     return {
       user_id: staff.user_id,

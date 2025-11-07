@@ -3,46 +3,46 @@ const userIdValidate = require("../utils/userIdValidate.js");
 const permission = require("../utils/permission.js");
 const statusCodePermission = require("../utils/statusCodePermission.js");
 const validateError = require("../utils/validateError.js");
-const printf = require("../utils/printf.utils.js");
 
 exports.createOrder = async (user_id, orders, role) => {
-  await userIdValidate(user_id);
-
   if (![permission.admin, permission.sale_person].includes(role)) {
     throw validateError("No have permission", 403);
   }
 
+  await userIdValidate(user_id);
+
+  const ordersToInsert = [];
+
   for (const order of orders) {
-    const saleId = order.sale_person;
+    const { customer_id, total_price, sale_person } = order;
+
+    const customer = await db("customers")
+      .where({ id: customer_id, is_deleted: 0 })
+      .first();
+    if (!customer) {
+      throw validateError(`Customer ID ${customer_id} not found`, 404);
+    }
 
     const salePerson = await db("staff")
-      .where({ id: saleId, permission_lvl: 3, status: "active" })
+      .where({ id: sale_person, permission_lvl: 3, status: "active" })
       .first();
-
     if (!salePerson) {
-      throw validateError(`Sale person ID ${saleId} not found`, 404);
+      throw validateError(`Sale person ID ${sale_person} not found`, 404);
     }
 
-    let customerQuery = db("customers").where({
-      id: order.customer_id,
-      is_deleted: false,
+    ordersToInsert.push({
+      user_id,
+      customer_id,
+      sale_person,
+      total_price: total_price || 0.0,
+      status: "pending",
+      is_deleted: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
     });
-
-    if (role === permission.sale_person) {
-      customerQuery.andWhere({ sale_person: saleId });
-    }
-
-    const customer = await customerQuery.first();
-    if (!customer) {
-      throw validateError(`Customer ID ${order.customer_id} not found`, 404);
-    }
   }
 
-  const dataToInsert = orders.map((order) => ({
-    ...order,
-    user_id,
-  }));
-  await db("orders").insert(dataToInsert);
+  await db("orders").insert(ordersToInsert);
 };
 
 exports.getAllOrder = async (
@@ -161,14 +161,12 @@ exports.inventoryManagerApproveOrReject = async (
   role,
   action
 ) => {
-  // 1️⃣ Check permission
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No permission to approve or reject orders", 403);
   }
 
   await userIdValidate(user_id);
 
-  // 2️⃣ Check inventory manager exists
   const staff = await db("staff")
     .where({
       user_id,
@@ -179,7 +177,6 @@ exports.inventoryManagerApproveOrReject = async (
     .first();
   if (!staff) throw validateError("Inventory Manager not found", 404);
 
-  // 3️⃣ Check order exists and is pending
   const order = await db("orders")
     .where({ user_id, id: order_id, is_deleted: false })
     .first();
@@ -187,20 +184,17 @@ exports.inventoryManagerApproveOrReject = async (
   if (order.status !== "PENDING_APPROVAL")
     throw validateError("Order already processed", 400);
 
-  // 4️⃣ Determine new status
   let newStatus;
   if (action === "approve") newStatus = "APPROVED_BY_INVENTORY";
   else if (action === "reject") newStatus = "REJECTED_BY_INVENTORY";
   else throw validateError("Invalid action type", 400);
 
-  // 5️⃣ Update order status
   await db("orders").where({ id: order_id }).update({
     status: newStatus,
     inventory_manager_id: inventoryManagerId,
     updated_at: db.fn.now(),
   });
 
-  // 6️⃣ If approved, update stock & create stock logs
   if (newStatus === "APPROVED_BY_INVENTORY") {
     const orderItems = await db("order_items").where({ order_id, user_id });
 
@@ -220,12 +214,10 @@ exports.inventoryManagerApproveOrReject = async (
       if (newQty < 0)
         throw validateError(`Not enough stock for product ${product_id}`, 400);
 
-      // Update product quantity
       await db("products")
         .where({ id: product_id, user_id })
         .update({ quantity: newQty });
 
-      // Insert stock log
       await db("stocklogs").insert({
         user_id,
         staff_id: inventoryManagerId,
@@ -365,13 +357,11 @@ exports.financeGetOrderApproved = async (userId, role) => {
 
   await userIdValidate(userId);
 
-  const resultGetOrder = await db("orders")
-    .select("*")
-    .where({
-      user_id: userId,
-      is_deleted: false,
-      status: "APPROVED_BY_INVENTORY",
-    });
+  const resultGetOrder = await db("orders").select("*").where({
+    user_id: userId,
+    is_deleted: false,
+    status: "APPROVED_BY_INVENTORY",
+  });
 
   return resultGetOrder;
 };

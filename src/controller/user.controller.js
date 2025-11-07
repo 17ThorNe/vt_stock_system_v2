@@ -22,14 +22,13 @@ exports.login = async (request, reply) => {
   try {
     const { payload, token } = await userService.loginService(email, password);
 
-    // Set HttpOnly cookie
     reply
       .setCookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "Strict",
         path: "/",
-        maxAge: 3600, // 1 hour
+        maxAge: 3600,
       })
       .send({
         status: "success",

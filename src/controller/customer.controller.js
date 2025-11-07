@@ -14,6 +14,8 @@ exports.createCustomer = async (request, reply) => {
     finalSaleId = tokenSaleId;
   }
 
+  console.log(data);
+
   await handleController(request, reply, customerService.createCustomer, [
     user_id,
     finalSaleId,
