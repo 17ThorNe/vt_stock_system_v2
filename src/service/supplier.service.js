@@ -40,7 +40,8 @@ exports.getAllSupplier = async (user_id, role) => {
   await userIdValidate(user_id);
   const result = await db("supplier")
     .select("*")
-    .where({ user_id, status: "active" });
+    .where({ user_id, status: "active" })
+    .orderBy("created_at", "desc");
 
   if (result.length === 0) {
     throw validateError("Supplier not found!", 404);

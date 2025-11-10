@@ -41,7 +41,8 @@ exports.getAllProduct = async (
     .where({ user_id, is_deleted: false })
     .select("*")
     .limit(limit)
-    .offset(offset);
+    .offset(offset)
+    .orderBy("created_at", "desc");
 
   return {
     status: "success",
@@ -159,7 +160,9 @@ exports.createProduct = async (user_id, data, permissinRole) => {
     });
   }
 
-  await db("products").insert(productsToInsert);
+  const result = await db("products").insert(productsToInsert).returning("id");
+
+  return result;
 };
 
 exports.getProductById = async (id, user_id, permissinRole) => {
@@ -255,7 +258,7 @@ exports.getProductByCategoryId = async (
     .first();
   if (!category) {
     const error = new Error("Category not found");
-    error.statusCode = 404;
+    error.statusCode = 200;
     throw error;
   }
 
@@ -265,7 +268,7 @@ exports.getProductByCategoryId = async (
 
   if (products.length === 0) {
     const error = new Error("No products found for this category");
-    error.statusCode = 404;
+    error.statusCode = 200;
     throw error;
   }
 

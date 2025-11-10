@@ -21,96 +21,148 @@ exports.getAllStockLog = async (userId, role) => {
   return result;
 };
 
-exports.importStock = async (user_id, staff_id, role, data) => {
-  const {
-    product_id,
-    order_id,
-    supplier_id,
-    stock_type = "in",
-    quantity,
-    note,
-  } = data;
+exports.importStock = async (user_id, staff_id, role, dataArray) => {
+  // === 1. Validate input ===
+  if (!Array.isArray(dataArray) || dataArray.length === 0) {
+    throw validateError("Invalid or empty stock log data", 400);
+  }
 
   if (![permission.admin, permission.inventory].includes(role)) {
-    throw validateError("No have permission", 403);
+    throw validateError("No permission", 403);
   }
 
   await userIdValidate(user_id);
 
-  let isStaffId = db("staff")
-    .select("*")
+  // === 2. Validate staff ===
+  const staffQuery = db("staff")
     .where({ user_id, permission_lvl: 2, status: "active" })
     .first();
 
   if (role === permission.inventory) {
-    isStaffId.andWhere({ id: staff_id });
+    staffQuery.andWhere({ id: staff_id });
   }
 
-  const resultIsStaffId = await isStaffId;
+  const staff = await staffQuery;
+  if (!staff) throw validateError("Invalid Staff ID", 404);
 
-  if (!resultIsStaffId) {
-    throw validateError("Staff ID", 404);
+  // === 3. Extract unique IDs ===
+  const productIds = [
+    ...new Set(dataArray.map((d) => d.product_id).filter(Boolean)),
+  ];
+  const supplierIds = [
+    ...new Set(dataArray.map((d) => d.supplier_id).filter(Boolean)),
+  ];
+
+  if (productIds.length === 0 || supplierIds.length === 0) {
+    throw validateError("Missing product_id or supplier_id", 400);
   }
 
-  const isProductId = await db("products")
-    .select("*")
-    .where({ user_id, id: product_id, is_deleted: false })
-    .first();
+  // === 4. Validate products in bulk ===
+  const products = await db("products")
+    .whereIn("id", productIds)
+    .where({ user_id, is_deleted: false })
+    .select("id", "quantity");
 
-  if (!isProductId) {
-    throw validateError("Product ID", 404);
+  const productMap = Object.fromEntries(
+    products.map((p) => [p.id, p.quantity])
+  );
+  if (products.length !== productIds.length) {
+    throw validateError("One or more Product IDs are invalid or deleted", 404);
   }
 
-  const isOrderId = await db("orders")
-    .select("*")
-    .where({ user_id, id: order_id, is_deleted: false })
-    .first();
+  // === 5. Validate suppliers in bulk ===
+  const suppliers = await db("supplier")
+    .whereIn("id", supplierIds)
+    .where({ user_id, status: "active" })
+    .select("id");
 
-  if (!isOrderId) {
-    throw validateError("Order ID", 404);
+  if (suppliers.length !== supplierIds.length) {
+    throw validateError(
+      "One or more Supplier IDs are invalid or inactive",
+      404
+    );
   }
 
-  const getQtyProduct = await db("products")
-    .select("quantity")
-    .where({ user_id, id: product_id, is_deleted: false })
-    .first();
+  // === 6. Prepare logs + calculate new quantities ===
+  const logsToInsert = [];
+  const productUpdates = {}; // { product_id: newQty }
 
-  const previousQty = getQtyProduct.quantity;
+  for (const data of dataArray) {
+    const {
+      product_id,
+      order_id = null,
+      supplier_id,
+      stock_type = "in",
+      quantity,
+      note,
+    } = data;
 
-  let updateTotalQuantity;
+    // Required fields
+    if (!product_id || !supplier_id || !quantity) {
+      throw validateError(
+        "Missing required fields: product_id, supplier_id, quantity",
+        400
+      );
+    }
 
-  if (stock_type === "in") {
-    updateTotalQuantity = previousQty + quantity;
-  } else if (stock_type === "out") {
-    updateTotalQuantity = previousQty - quantity;
+    const previousQty = productMap[product_id];
+    let newQty;
+
+    if (stock_type === "in") {
+      newQty = previousQty + quantity;
+    } else if (stock_type === "out") {
+      newQty = previousQty - quantity;
+      if (newQty < 0) {
+        throw validateError(
+          `Insufficient stock for product ID ${product_id}`,
+          400
+        );
+      }
+    } else {
+      throw validateError("Invalid stock_type. Must be 'in' or 'out'", 400);
+    }
+
+    logsToInsert.push({
+      user_id,
+      staff_id,
+      order_id,
+      product_id,
+      supplier_id,
+      stock_type,
+      quantity,
+      p_stock: previousQty,
+      n_stock: newQty,
+      note: note || null,
+      created_at: new Date(),
+    });
+
+    productUpdates[product_id] = newQty;
   }
 
-  const isSupplierId = await db("supplier")
-    .select("*")
-    .where({ user_id, id: supplier_id, status: "active" })
-    .first();
+  // === 7. TRANSACTION: Update products + Insert logs (ONCE) ===
+  return await db.transaction(async (trx) => {
+    // Update product quantities
+    for (const [pid, qty] of Object.entries(productUpdates)) {
+      await trx("products")
+        .update({ quantity: qty })
+        .where({ user_id, id: pid, is_deleted: false });
+    }
 
-  if (!isSupplierId) {
-    throw validateError("Supplier ID", 404);
-  }
+    // === INSERT ONLY ONCE ===
+    await trx("stocklogs").insert(logsToInsert);
 
-  const finalInsertData = {
-    user_id,
-    staff_id,
-    order_id,
-    product_id,
-    supplier_id,
-    stock_type,
-    quantity,
-    p_stock: previousQty,
-    n_stock: updateTotalQuantity,
-    note,
-    created_at: new Date(),
-  };
+    // === Get inserted IDs safely (MySQL) ===
+    const [before] = await trx.raw("SELECT LAST_INSERT_ID() as id");
+    const firstId = before.id + 1;
+    const insertedIds = Array.from(
+      { length: logsToInsert.length },
+      (_, i) => firstId + i
+    );
 
-  await db("products")
-    .update({ quantity: updateTotalQuantity })
-    .where({ user_id, id: product_id, is_deleted: false });
-
-  await db("stocklogs").insert(finalInsertData);
+    return {
+      success: true,
+      count: logsToInsert.length,
+      inserted_ids: insertedIds,
+    };
+  });
 };
