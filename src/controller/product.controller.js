@@ -5,7 +5,6 @@ exports.getAllProducts = async (request, reply) => {
   try {
     const { page, limit } = request.query;
     const { role, user_id } = request.user;
-    console.log("Hello permission role", role);
     const result = await productService.getAllProduct(
       user_id,
       parseInt(page) || 1,

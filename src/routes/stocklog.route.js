@@ -13,6 +13,11 @@ async function stockLogRoutes(fastify, option) {
     { preHandler: [verifyApiKey, JWTAuth] },
     stockLogController.importStock
   );
+  fastify.get(
+    "/stocklog/stats",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    stockLogController.stockLogStats
+  );
 }
 
 module.exports = stockLogRoutes;

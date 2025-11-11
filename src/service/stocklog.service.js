@@ -22,7 +22,7 @@ exports.getAllStockLog = async (userId, role) => {
 };
 
 exports.importStock = async (user_id, staff_id, role, dataArray) => {
-  // === 1. Validate input ===
+  // 1️⃣ Validate input
   if (!Array.isArray(dataArray) || dataArray.length === 0) {
     throw validateError("Invalid or empty stock log data", 400);
   }
@@ -33,7 +33,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
 
   await userIdValidate(user_id);
 
-  // === 2. Validate staff ===
+  // 2️⃣ Validate staff
   const staffQuery = db("staff")
     .where({ user_id, permission_lvl: 2, status: "active" })
     .first();
@@ -45,7 +45,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
   const staff = await staffQuery;
   if (!staff) throw validateError("Invalid Staff ID", 404);
 
-  // === 3. Extract unique IDs ===
+  // 3️⃣ Extract unique product & supplier IDs
   const productIds = [
     ...new Set(dataArray.map((d) => d.product_id).filter(Boolean)),
   ];
@@ -57,7 +57,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
     throw validateError("Missing product_id or supplier_id", 400);
   }
 
-  // === 4. Validate products in bulk ===
+  // 4️⃣ Validate products
   const products = await db("products")
     .whereIn("id", productIds)
     .where({ user_id, is_deleted: false })
@@ -70,7 +70,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
     throw validateError("One or more Product IDs are invalid or deleted", 404);
   }
 
-  // === 5. Validate suppliers in bulk ===
+  // 5️⃣ Validate suppliers
   const suppliers = await db("supplier")
     .whereIn("id", supplierIds)
     .where({ user_id, status: "active" })
@@ -83,9 +83,9 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
     );
   }
 
-  // === 6. Prepare logs + calculate new quantities ===
+  // 6️⃣ Prepare logs + calculate new quantities
+  const productUpdates = {};
   const logsToInsert = [];
-  const productUpdates = {}; // { product_id: newQty }
 
   for (const data of dataArray) {
     const {
@@ -94,10 +94,11 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       supplier_id,
       stock_type = "in",
       quantity,
+      cost_price,
+      sale_price,
       note,
     } = data;
 
-    // Required fields
     if (!product_id || !supplier_id || !quantity) {
       throw validateError(
         "Missing required fields: product_id, supplier_id, quantity",
@@ -112,12 +113,11 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       newQty = previousQty + quantity;
     } else if (stock_type === "out") {
       newQty = previousQty - quantity;
-      if (newQty < 0) {
+      if (newQty < 0)
         throw validateError(
           `Insufficient stock for product ID ${product_id}`,
           400
         );
-      }
     } else {
       throw validateError("Invalid stock_type. Must be 'in' or 'out'", 400);
     }
@@ -130,6 +130,8 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       supplier_id,
       stock_type,
       quantity,
+      cost_price: cost_price || 0,
+      sale_price: sale_price || 0,
       p_stock: previousQty,
       n_stock: newQty,
       note: note || null,
@@ -139,25 +141,22 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
     productUpdates[product_id] = newQty;
   }
 
-  // === 7. TRANSACTION: Update products + Insert logs (ONCE) ===
+  // 7️⃣ TRANSACTION: update products + insert logs
   return await db.transaction(async (trx) => {
+    const insertedIds = [];
+
     // Update product quantities
-    for (const [pid, qty] of Object.entries(productUpdates)) {
+    for (const pid in productUpdates) {
       await trx("products")
-        .update({ quantity: qty })
+        .update({ quantity: productUpdates[pid] })
         .where({ user_id, id: pid, is_deleted: false });
     }
 
-    // === INSERT ONLY ONCE ===
-    await trx("stocklogs").insert(logsToInsert);
-
-    // === Get inserted IDs safely (MySQL) ===
-    const [before] = await trx.raw("SELECT LAST_INSERT_ID() as id");
-    const firstId = before.id + 1;
-    const insertedIds = Array.from(
-      { length: logsToInsert.length },
-      (_, i) => firstId + i
-    );
+    // Insert logs one by one
+    for (const log of logsToInsert) {
+      const [id] = await trx("stocklogs").insert(log);
+      insertedIds.push(id);
+    }
 
     return {
       success: true,
@@ -165,4 +164,34 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       inserted_ids: insertedIds,
     };
   });
+};
+
+exports.getStockLogStats = async (user_id, role) => {
+  if (![permission.admin, permission.inventory].includes(role)) {
+    throw validateError("No permission", 403);
+  }
+
+  await userIdValidate(user_id);
+
+  const result = await db("stocklogs")
+    .where("user_id", user_id)
+    .select(
+      db.raw(
+        `IFNULL(SUM(CASE WHEN stock_type = 'out' THEN quantity * sale_price END), 0) AS revenue`
+      ),
+      db.raw(
+        `IFNULL(SUM(CASE WHEN stock_type = 'in' THEN quantity * cost_price END), 0) AS cost`
+      ),
+      db.raw(
+        `IFNULL(SUM(CASE WHEN stock_type = 'out' THEN quantity * (sale_price - cost_price) END), 0) AS profit`
+      )
+    )
+    .first();
+
+  return {
+    revenue: Number(result.revenue),
+    cost: Number(result.cost),
+    profit: Number(result.profit),
+    loss: result.profit < 0 ? Math.abs(result.profit) : 0,
+  };
 };

@@ -21,3 +21,11 @@ exports.importStock = async (request, reply) => {
     data,
   ]);
 };
+
+exports.stockLogStats = async (request, reply) => {
+  const { user_id, role } = request.user;
+  await handleController(request, reply, stockLogService.getStockLogStats, [
+    user_id,
+    role,
+  ]);
+};

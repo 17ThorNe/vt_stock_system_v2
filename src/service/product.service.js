@@ -145,8 +145,9 @@ exports.createProduct = async (user_id, data, permissinRole) => {
       description: product.description || null,
       sku: product.sku,
       category_id: product.category_id,
-      price: product.price !== undefined ? parseFloat(product.price) : 0.0,
-      cost: product.cost !== undefined ? parseFloat(product.cost) : 0.0,
+      default_price:
+        product.price !== undefined ? parseFloat(product.price) : 0.0,
+      default_cost: product.cost !== undefined ? parseFloat(product.cost) : 0.0,
       quantity:
         product.quantity !== undefined ? parseInt(product.quantity, 10) : 0,
       total_in:
