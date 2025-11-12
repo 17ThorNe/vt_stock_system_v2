@@ -62,108 +62,88 @@ exports.createProduct = async (user_id, data, permissinRole) => {
   }
 
   const user = await db("users").where({ id: user_id }).first();
-  if (!user) {
-    const error = new Error("User ID not found!");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!user) throw validateError("User not found", 404);
 
-  if (!Array.isArray(data)) {
-    const error = new Error("Input data must be an array of products!");
-    error.statusCode = 400;
-    throw error;
-  }
+  if (!Array.isArray(data)) throw validateError("Data must be an array", 400);
 
   const productsToInsert = [];
 
   for (const product of data) {
+    // ---------- Normalise price / cost ----------
+    const price =
+      product.price ?? product.selling_price ?? product.default_price ?? 0;
+    const cost = product.cost ?? product.unit_cost ?? product.default_cost ?? 0;
+
+    if (!price || isNaN(price))
+      throw validateError("Price is required and must be a number", 400);
+    if (!cost || isNaN(cost))
+      throw validateError("Cost is required and must be a number", 400);
+
+    // ---------- Required fields ----------
     if (
       !product.name ||
       typeof product.name !== "string" ||
       product.name.trim() === ""
     ) {
-      const error = new Error(
-        "Product name is required and must be a non-empty string"
-      );
-      error.statusCode = 400;
-      throw error;
+      throw validateError("Product name is required and non-empty", 400);
     }
-
     if (
       !product.sku ||
       typeof product.sku !== "string" ||
       product.sku.trim() === ""
     ) {
-      const error = new Error(
-        "Product SKU is required and must be a non-empty string"
-      );
-      error.statusCode = 400;
-      throw error;
+      throw validateError("SKU is required and non-empty", 400);
     }
-
     if (!Number.isInteger(product.category_id)) {
-      const error = new Error("Category ID is required and must be an integer");
-      error.statusCode = 400;
-      throw error;
+      throw validateError("category_id must be an integer", 400);
     }
 
+    // ---------- Category exists ----------
     const category = await db("categories")
       .where({ id: product.category_id, user_id, is_deleted: false })
       .first();
-    if (!category) {
-      const error = new Error(
-        `Category ID ${product.category_id} not found for this user`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
+    if (!category)
+      throw validateError(`Category ID ${product.category_id} not found`, 404);
 
-    const existingProduct = await db("products")
+    // ---------- Duplicate name / SKU ----------
+    const existingName = await db("products")
       .whereRaw("LOWER(name) = ? AND user_id = ? AND is_deleted = ?", [
         product.name.toLowerCase(),
         user_id,
         false,
       ])
       .first();
-    if (existingProduct) {
-      const error = new Error(`Product name '${product.name}' already exists`);
-      error.statusCode = 400;
-      throw error;
-    }
+    if (existingName)
+      throw validateError(`Product name '${product.name}' already exists`, 400);
 
     const existingSku = await db("products")
       .where({ sku: product.sku, is_deleted: false })
       .first();
-    if (existingSku) {
-      const error = new Error(`SKU '${product.sku}' already exists`);
-      error.statusCode = 400;
-      throw error;
-    }
+    if (existingSku)
+      throw validateError(`SKU '${product.sku}' already exists`, 400);
 
+    // ---------- Build insert ----------
     productsToInsert.push({
-      name: product.name,
-      description: product.description || null,
-      sku: product.sku,
+      name: product.name.trim(),
+      description: product.description ?? null,
+      sku: product.sku.trim(),
       category_id: product.category_id,
-      default_price:
-        product.price !== undefined ? parseFloat(product.price) : 0.0,
-      default_cost: product.cost !== undefined ? parseFloat(product.cost) : 0.0,
-      quantity:
-        product.quantity !== undefined ? parseInt(product.quantity, 10) : 0,
-      total_in:
-        product.total_in !== undefined ? parseInt(product.total_in, 10) : 0,
-      total_out:
-        product.total_out !== undefined ? parseInt(product.total_out, 10) : 0,
-      product_img: product.product_img || null,
+      default_price: parseFloat(price),
+      default_cost: parseFloat(cost),
+      quantity: 0, // always start at zero
+      total_in: 0,
+      total_out: 0,
+      product_img: product.product_img ?? null,
       user_id,
-      status: product.status || "active",
+      status: product.status ?? "active",
       is_deleted: false,
     });
   }
 
-  const result = await db("products").insert(productsToInsert).returning("id");
-
-  return result;
+  const insertedIds = await db("products")
+    .insert(productsToInsert)
+    .returning("id");
+  return insertedIds;
 };
 
 exports.getProductById = async (id, user_id, permissinRole) => {
