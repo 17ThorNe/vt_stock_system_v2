@@ -52,6 +52,7 @@ exports.getAllOrder = async (
   page = 1,
   limit = 10
 ) => {
+  // ---------- 1. Permission check ----------
   if (
     ![
       permission.admin,
@@ -67,22 +68,76 @@ exports.getAllOrder = async (
 
   const offset = (page - 1) * limit;
 
-  let query = db("orders").where({ user_id, is_deleted: false });
+  // ---------- 2. Fetch orders with staff ----------
+  let orderQuery = db("orders AS o")
+    .leftJoin("staff AS s", "o.sale_person", "s.id")
+    .where("o.user_id", user_id)
+    .andWhere("o.is_deleted", 0);
 
   if (role === permission.sale_person) {
-    query = query.andWhere({ sale_person });
+    orderQuery = orderQuery.andWhere("o.sale_person", sale_person);
   }
 
-  const result = await query.clone().select("*").limit(limit).offset(offset);
+  // ---------- 3. Fetch paginated orders ----------
+  const orders = await orderQuery
+    .clone()
+    .select("o.*", "s.fullname AS sale_name", "s.id AS staff_id")
+    .limit(limit)
+    .offset(offset);
 
-  const [{ count }] = await query.clone().count("* as count");
+  // ---------- 4. Count total ----------
+  const [{ count }] = await orderQuery.clone().count("* as count");
 
-  if (result.length === 0) {
+  if (orders.length === 0) {
     throw validateError("Order not found!", 404);
   }
 
+  const orderIds = orders.map((o) => o.id);
+
+  // ---------- 5. Fetch order_items with product info ----------
+  const items = await db("order_items AS oi")
+    .leftJoin("products AS p", "oi.product_id", "p.id")
+    .whereIn("oi.order_id", orderIds)
+    .select(
+      "oi.id AS item_id",
+      "oi.order_id",
+      "oi.product_id",
+      "oi.quantity",
+      "oi.price",
+      "p.name AS product_name",
+      "p.description AS product_description",
+      "p.sku AS product_sku",
+      "p.default_cost AS product_default_cost",
+      "p.default_price AS product_default_price",
+      "p.product_img AS product_img",
+      "p.status AS product_status"
+    );
+
+  // ---------- 6. Merge items into orders ----------
+  const data = orders.map((order) => ({
+    ...order,
+    items: items
+      .filter((item) => item.order_id === order.id)
+      .map((item) => ({
+        id: item.item_id,
+        quantity: item.quantity,
+        price: item.price,
+        product: {
+          id: item.product_id,
+          name: item.product_name,
+          description: item.product_description,
+          sku: item.product_sku,
+          default_cost: item.product_default_cost,
+          default_price: item.product_default_price,
+          product_img: item.product_img,
+          status: item.product_status,
+        },
+      })),
+  }));
+
+  // ---------- 7. Return paginated result ----------
   return {
-    data: result,
+    data,
     pagination: {
       total: Number(count),
       page: Number(page),
@@ -93,6 +148,7 @@ exports.getAllOrder = async (
 };
 
 exports.getOrderById = async (user_id, sale_person, order_id, role) => {
+  // ---------- 1. Permission check ----------
   if (
     ![permission.admin, permission.inventory, permission.sale_person].includes(
       role
@@ -100,28 +156,93 @@ exports.getOrderById = async (user_id, sale_person, order_id, role) => {
   ) {
     throw validateError("No have permission", 403);
   }
+
+  await userIdValidate(user_id);
+
+  // ---------- 2. Build base query ----------
+  let query = db("orders AS o")
+    .leftJoin("order_items AS oi", "oi.order_id", "o.id")
+    .leftJoin("products AS p", "p.id", "oi.product_id")
+    .select(
+      // Orders
+      "o.id AS order_id",
+      "o.user_id AS order_user_id",
+      "o.customer_id AS order_customer_id",
+      "o.sale_person AS order_sale_person",
+      "o.total_price AS order_total_price",
+      "o.status AS order_status",
+      "o.is_deleted AS order_is_deleted",
+      "o.created_at AS order_created_at",
+      "o.updated_at AS order_updated_at",
+
+      // Order Items
+      "oi.id AS item_id",
+      "oi.quantity AS item_quantity",
+      "oi.created_at AS item_created_at",
+      "oi.updated_at AS item_updated_at",
+
+      // Products
+      "p.id AS product_id",
+      "p.name AS product_name",
+      "p.description AS product_description",
+      "p.sku AS product_sku",
+      "p.default_cost AS product_default_cost",
+      "p.default_price AS product_default_price",
+      "p.product_img AS product_img",
+      "p.status AS product_status"
+    )
+    .where("o.is_deleted", 0)
+    .andWhere("o.user_id", user_id)
+    .andWhere("o.id", order_id);
+
+  // ---------- 3. Filter for sale_person role ----------
   if (role === permission.sale_person) {
-    await userIdValidate(user_id);
-    const result = await db("orders")
-      .select("*")
-      .where({ user_id, sale_person, id: order_id, is_deleted: false });
-
-    if (result.length === 0) {
-      throw validateError("Order", 404);
-    }
-
-    return result;
-  } else {
-    await userIdValidate(user_id);
-    const result = await db("orders")
-      .select("*")
-      .where({ user_id, id: order_id, is_deleted: false });
-
-    if (result.length === 0) {
-      throw validateError("Order", 404);
-    }
-    return result;
+    query = query.andWhere("o.sale_person", sale_person);
   }
+
+  // ---------- 4. Execute query ----------
+  const rows = await query;
+
+  if (rows.length === 0) {
+    throw validateError("Order not found", 404);
+  }
+
+  // ---------- 5. Format order and items ----------
+  const order = {
+    id: rows[0].order_id,
+    user_id: rows[0].order_user_id,
+    customer_id: rows[0].order_customer_id,
+    sale_person: rows[0].order_sale_person,
+    total_price: rows[0].order_total_price,
+    status: rows[0].order_status,
+    is_deleted: rows[0].order_is_deleted,
+    created_at: rows[0].order_created_at,
+    updated_at: rows[0].order_updated_at,
+  };
+
+  const items = rows
+    .filter((r) => r.item_id) // only include if item exists
+    .map((row) => ({
+      item: {
+        id: row.item_id,
+        quantity: row.item_quantity,
+        created_at: row.item_created_at,
+        updated_at: row.item_updated_at,
+      },
+      product: {
+        id: row.product_id,
+        name: row.product_name,
+        description: row.product_description,
+        sku: row.product_sku,
+        default_cost: row.product_default_cost,
+        default_price: row.product_default_price,
+        product_img: row.product_img,
+        status: row.product_status,
+      },
+    }));
+
+  // ---------- 6. Return final structured result ----------
+  return { order, items };
 };
 
 exports.updateOrder = async (
