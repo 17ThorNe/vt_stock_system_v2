@@ -60,3 +60,5 @@ exports.getMe = async (request, reply) => {
     return reply.status(404).send({ status: "error", message: err.message });
   }
 };
+
+// here update
