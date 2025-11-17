@@ -61,4 +61,23 @@ exports.getMe = async (request, reply) => {
   }
 };
 
-// here update
+exports.logoutController = async (request, reply) => {
+  try {
+    reply.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+    });
+
+    return reply.send({
+      status: "success",
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    return reply.status(500).send({
+      status: "error",
+      message: "Failed to logout",
+    });
+  }
+};

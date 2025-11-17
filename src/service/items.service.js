@@ -12,45 +12,110 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
 
   await userIdValidate(user_id);
 
-  let isStaff = db("staff")
-    .select("*")
-    .where({ status: "active", user_id, permission_lvl: 3 });
+  // Staff validation
+  let staffQuery = db("staff").where({
+    status: "active",
+    user_id,
+    permission_lvl: 3,
+  });
 
   if (role === permission.sale_person) {
-    isStaff.andWhere({ id: staff_id });
+    staffQuery.andWhere({ id: staff_id });
   }
 
-  const result = await isStaff;
-  if (result.length === 0) {
-    throw validateError("Staff ID", 404);
+  const staff = await staffQuery;
+  if (staff.length === 0) {
+    throw validateError("Staff ID not valid", 404);
   }
 
-  let orderQuery = db("orders")
-    .select("*")
-    .where({ user_id, id: order_id, is_deleted: false });
+  // Validate order owner
+  let orderQuery = db("orders").where({
+    user_id,
+    id: order_id,
+    is_deleted: false,
+  });
 
   if (role === permission.sale_person) {
     orderQuery.andWhere({ sale_person: staff_id });
   }
 
-  const checkOrderQuery = await orderQuery;
-  if (checkOrderQuery.length === 0) {
+  const order = await orderQuery;
+  if (order.length === 0) {
     throw validateError("Order ID not found", 404);
   }
 
   if (!Array.isArray(data)) {
-    throw validateError("Data must be an array of items", 400);
+    throw validateError("Data must be an array", 400);
   }
 
-  const finalDataToInsert = data.map((item) => ({
+  // Prepare order_items data
+  const itemsToInsert = data.map((x) => ({
     order_id,
     user_id,
     sale_id: staff_id,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    price: item.price,
+    product_id: x.product_id,
+    quantity: x.quantity,
+    price: x.price,
   }));
-  await db("order_items").insert(finalDataToInsert);
+
+  return await db.transaction(async (trx) => {
+    // Insert order_items
+    await trx("order_items").insert(itemsToInsert);
+
+    // Auto Stock-out (for each item)
+    for (const item of data) {
+      const { product_id, quantity, price } = item;
+
+      const product = await trx("products")
+        .where({ user_id, id: product_id, is_deleted: false })
+        .select("quantity", "total_out")
+        .first();
+
+      if (!product) {
+        throw validateError(`Product ID ${product_id} not found`, 404);
+      }
+
+      const previousQty = product.quantity;
+      const newQty = previousQty - quantity;
+
+      if (newQty < 0) {
+        throw validateError(
+          `Insufficient stock for product ID ${product_id}`,
+          400
+        );
+      }
+
+      // Update product quantity
+      await trx("products")
+        .update({
+          quantity: newQty,
+          total_out: db.raw(`total_out + ${quantity}`),
+        })
+        .where({ user_id, id: product_id });
+
+      // Insert stock log (auto stock-out)
+      await trx("stocklogs").insert({
+        user_id,
+        staff_id,
+        product_id,
+        supplier_id: null,
+        order_id,
+        stock_type: "out",
+        quantity,
+        cost_price: 0,
+        sale_price: price,
+        p_stock: previousQty,
+        n_stock: newQty,
+        note: `Sold ${quantity} units`,
+        created_at: new Date(),
+      });
+    }
+
+    return {
+      success: true,
+      message: "Order items created & stock updated successfully",
+    };
+  });
 };
 
 exports.getAllItems = async (user_id, staff_id, role) => {
@@ -74,9 +139,7 @@ exports.getAllItems = async (user_id, staff_id, role) => {
     throw validateError("Staff ID", 404);
   }
 
-  let itemsQuery = db("order_items")
-    .select("*")
-    .where({ user_id, is_deleted: false });
+  let itemsQuery = db("order_items").select("*").where({ user_id });
 
   if (role === permission.sale_person) {
     itemsQuery.andWhere({ sale_id: staff_id });

@@ -6,15 +6,12 @@ const printf = require("../utils/printf.utils.js");
 const logJSON = require("../utils/logJSON.js");
 
 exports.getAllStockLog = async (userId, role) => {
-  // Permission check
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No have permission", 403);
   }
 
-  // Validate user
   await userIdValidate(userId);
 
-  // Query with INNER JOIN
   const result = await db("stocklogs as sl")
     .join("products as p", "sl.product_id", "p.id")
     .select(
@@ -52,26 +49,29 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
   if (!Array.isArray(dataArray) || dataArray.length === 0) {
     throw validateError("Invalid or empty stock log data", 400);
   }
+
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No permission", 403);
   }
+
   await userIdValidate(user_id);
 
   let staffQuery = db("staff")
     .where({ user_id, permission_lvl: 2, status: "active" })
     .first();
-  if (role === permission.inventory) {
-    staffQuery = staffQuery.andWhere({ id: staff_id });
-  }
-  const staff = await staffQuery;
-  if (!staff) throw validateError("Invalid Staff ID", 404);
 
-  const productIds = [
-    ...new Set(dataArray.map((d) => d.product_id).filter(Boolean)),
-  ];
-  const supplierIds = [
-    ...new Set(dataArray.map((d) => d.supplier_id).filter(Boolean)),
-  ];
+  if (role === permission.inventory) {
+    staffQuery.andWhere({ id: staff_id });
+  }
+
+  const staff = await staffQuery;
+  if (!staff) {
+    throw validateError("Invalid Staff ID", 404);
+  }
+
+  const productIds = [...new Set(dataArray.map((x) => x.product_id))];
+  const supplierIds = [...new Set(dataArray.map((x) => x.supplier_id))];
+
   if (!productIds.length || !supplierIds.length) {
     throw validateError("Missing product_id or supplier_id", 400);
   }
@@ -80,23 +80,22 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
     .whereIn("id", productIds)
     .where({ user_id, is_deleted: false })
     .select("id", "quantity");
+
+  if (products.length !== productIds.length) {
+    throw validateError("One or more Product IDs invalid", 404);
+  }
+
   const productMap = Object.fromEntries(
     products.map((p) => [p.id, p.quantity])
   );
-  if (products.length !== productIds.length) {
-    throw validateError("One or more Product IDs are invalid or deleted", 404);
-  }
 
-  // ------------------------------------------------- 5. Suppliers validation
   const suppliers = await db("supplier")
     .whereIn("id", supplierIds)
     .where({ user_id, status: "active" })
     .select("id");
+
   if (suppliers.length !== supplierIds.length) {
-    throw validateError(
-      "One or more Supplier IDs are invalid or inactive",
-      404
-    );
+    throw validateError("Supplier ID invalid or inactive", 404);
   }
 
   const logsToInsert = [];
@@ -105,49 +104,30 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
   for (const data of dataArray) {
     const {
       product_id,
-      order_id = null,
       supplier_id,
-      stock_type = "in",
+      stock_type,
       quantity,
       cost_price,
       sale_price,
       note,
+      order_id = null,
     } = data;
 
-    if (!product_id || !supplier_id || !quantity) {
-      throw validateError(
-        "Missing required fields: product_id, supplier_id, quantity",
-        400
-      );
-    }
-
     const previousQty = productMap[product_id];
-    let newQty = 0;
-    let incIn = 0;
-    let incOut = 0;
+    let newQty = previousQty;
 
-    if (stock_type === "in") {
-      newQty = previousQty + quantity;
-      incIn = quantity;
-    } else if (stock_type === "out") {
-      newQty = previousQty - quantity;
-      incOut = quantity;
-      if (newQty < 0) {
-        throw validateError(
-          `Insufficient stock for product ID ${product_id}`,
-          400
-        );
-      }
-    } else {
-      throw validateError("Invalid stock_type. Must be 'in' or 'out'", 400);
-    }
+    if (stock_type === "in") newQty += quantity;
+    else if (stock_type === "out") {
+      newQty -= quantity;
+      if (newQty < 0) throw validateError("Insufficient stock", 400);
+    } else throw validateError("Invalid stock_type", 400);
 
     logsToInsert.push({
       user_id,
       staff_id,
-      order_id,
       product_id,
       supplier_id,
+      order_id,
       stock_type,
       quantity,
       cost_price: cost_price ?? 0,
@@ -158,42 +138,30 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       created_at: new Date(),
     });
 
+    productMap[product_id] = newQty;
+
     productUpdates[product_id] = {
       quantity: newQty,
-      total_in: incIn ? db.raw(`total_in  + ${incIn}`) : undefined,
-      total_out: incOut ? db.raw(`total_out + ${incOut}`) : undefined,
+      total_in:
+        stock_type === "in" ? db.raw(`total_in + ${quantity}`) : undefined,
+      total_out:
+        stock_type === "out" ? db.raw(`total_out + ${quantity}`) : undefined,
     };
   }
 
   return await db.transaction(async (trx) => {
     for (const [pid, upd] of Object.entries(productUpdates)) {
-      const updateObj = { quantity: upd.quantity };
-      if (upd.total_in) updateObj.total_in = upd.total_in;
-      if (upd.total_out) updateObj.total_out = upd.total_out;
-
       await trx("products")
-        .update(updateObj)
+        .update(upd)
         .where({ user_id, id: pid, is_deleted: false });
     }
 
-    const insertedIds = await trx("stocklogs").insert(logsToInsert);
-
-    const fullLogs = await trx("stocklogs as sl")
-      .join("products as p", "sl.product_id", "p.id")
-      .select(
-        "sl.*",
-        "p.name as product_name",
-        "p.product_img as product_image",
-        "p.sku as product_sku"
-      )
-      .whereIn("sl.id", insertedIds)
-      .orderBy("sl.created_at", "desc");
+    const inserted = await trx("stocklogs").insert(logsToInsert);
 
     return {
       success: true,
       count: logsToInsert.length,
-      inserted_ids: insertedIds,
-      // logs: fullLogs,
+      inserted_ids: inserted,
     };
   });
 };

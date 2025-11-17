@@ -25,6 +25,11 @@ async function routes(fastify, option) {
     { preHandler: [verifyApiKey, JWTAuth] },
     userController.getMe
   );
+  fastify.post(
+    "/auth/logout",
+    { preHandler: [verifyApiKey] },
+    userController.logoutController
+  );
 }
 
 module.exports = routes;

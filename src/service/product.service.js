@@ -39,6 +39,7 @@ exports.getAllProduct = async (
 
   const products = await db("products")
     .where({ user_id, is_deleted: false })
+    .andWhere("quantity", ">", 0)
     .select("*")
     .limit(limit)
     .offset(offset)

@@ -70,6 +70,7 @@ exports.getSupplierById = async (user_id, id, role) => {
 };
 
 exports.updateSupplier = async (user_id, id, staff_id, role, data) => {
+  console.log(data);
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No have permission", 403);
   }
