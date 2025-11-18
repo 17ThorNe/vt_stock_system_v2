@@ -89,7 +89,7 @@ exports.getAllOrder = async (
   const [{ count }] = await orderQuery.clone().count("* as count");
 
   if (orders.length === 0) {
-    throw validateError("Order not found!", 404);
+    throw validateError("Order not found!", 200);
   }
 
   const orderIds = orders.map((o) => o.id);

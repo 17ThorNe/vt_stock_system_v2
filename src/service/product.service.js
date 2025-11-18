@@ -31,7 +31,7 @@ exports.getAllProduct = async (
 
   if (!total || total.count === 0) {
     const error = new Error("No products found");
-    error.statusCode = 404;
+    error.statusCode = 200;
     throw error;
   }
 

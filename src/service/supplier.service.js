@@ -44,7 +44,7 @@ exports.getAllSupplier = async (user_id, role) => {
     .orderBy("created_at", "desc");
 
   if (result.length === 0) {
-    throw validateError("Supplier not found!", 404);
+    throw validateError("Supplier not found!", 200);
   }
 
   return result;
@@ -70,7 +70,8 @@ exports.getSupplierById = async (user_id, id, role) => {
 };
 
 exports.updateSupplier = async (user_id, id, staff_id, role, data) => {
-  console.log(data);
+  console.log("Received data:", data);
+
   if (![permission.admin, permission.inventory].includes(role)) {
     throw validateError("No have permission", 403);
   }
@@ -78,34 +79,38 @@ exports.updateSupplier = async (user_id, id, staff_id, role, data) => {
   await userIdValidate(user_id);
 
   const isStaff = await db("staff")
-    .select("*")
     .where({ user_id, permission_lvl: 2, id: staff_id, status: "active" })
     .first();
 
-  if (!isStaff) {
-    throw validateError("Staff ID", 404);
-  }
+  if (!isStaff) throw validateError("Staff not found or inactive", 404);
 
-  const isSupplierId = await db("supplier")
-    .select("*")
-    .where({ user_id, status: "active", id })
+  // ← THIS IS THE IMPORTANT PART
+  const supplier = await db("supplier")
+    .where({ user_id, id, status: "active" })
     .first();
 
-  if (!isSupplierId) {
-    throw validateError("Supplier ID", 404);
-  }
+  if (!supplier) throw validateError("Supplier not found", 404);
 
   const finalDataUpdate = {
     ...data,
-    user_id,
+    user_id, // optional – usually you don't overwrite this
     inventory_mn_id: staff_id,
+    updated_at: db.fn.now(), // good practice
   };
-  await db("supplier").update(finalDataUpdate);
+
+  // CORRECT: add .where() before .update()
+  const rowsAffected = await db("supplier")
+    .where({ id, user_id }) // <-- THIS LINE WAS MISSING!
+    .update(finalDataUpdate);
+
+  if (rowsAffected === 0) {
+    throw validateError("Failed to update supplier (no rows changed)", 400);
+  }
 };
 
 exports.deleteSupplier = async (user_id, id, role) => {
   if (![permission.admin, permission.inventory].includes(role)) {
-    throw validateError("No have permission", 404);
+    throw validateError("No have permission", 401);
   }
 
   await userIdValidate(user_id);
