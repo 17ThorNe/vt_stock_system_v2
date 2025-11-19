@@ -10,7 +10,7 @@ const permission = {
 
 exports.createCategory = async (user_id, categoryDto, permissinRole) => {
   if (![permission.admin, permission.inventory].includes(permissinRole)) {
-    throw validateError("No have permission", 403);
+    throw validateError("No permission", 403);
   }
 
   const checkUserId = await db("users").where({ id: user_id }).first();
@@ -19,29 +19,64 @@ exports.createCategory = async (user_id, categoryDto, permissinRole) => {
     error.statusCode = 404;
     throw error;
   }
-  for (const cat of categoryDto) {
-    const existingCategory = await db("categories")
-      .where({
-        name: cat.name.toLowerCase(),
-        user_id: user_id,
-        is_deleted: false,
-      })
-      .first();
-    if (existingCategory) {
-      const error = new Error(`Category name ${cat.name} already exists`);
+
+  const categories = Array.isArray(categoryDto) ? categoryDto : [categoryDto];
+
+  if (categories.length === 0) {
+    const error = new Error("No category data provided");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const categoryNames = categories.map((cat) => {
+    if (!cat.name || typeof cat.name !== "string") {
+      const error = new Error("Each category must have a valid 'name' field");
       error.statusCode = 400;
       throw error;
     }
+    return cat.name.trim().toLowerCase();
+  });
+
+  const uniqueNames = new Set(categoryNames);
+  if (uniqueNames.size !== categoryNames.length) {
+    const error = new Error("Duplicate category names in request");
+    error.statusCode = 400;
+    throw error;
   }
-  const categoriesToInsert = categoryDto.map((cat) => ({
-    name: cat.name.toLowerCase(),
-    description: cat.description || null,
+
+  const existingCategories = await db("categories")
+    .whereIn("name", categoryNames)
+    .andWhere({ user_id, is_deleted: false })
+    .select("name");
+
+  if (existingCategories.length > 0) {
+    const existingNames = existingCategories.map((c) => c.name).join(", ");
+    const error = new Error(`Category names already exist: ${existingNames}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const categoriesToInsert = categories.map((cat) => ({
+    name: cat.name.trim().toLowerCase(),
+    description: cat.description?.trim() || null,
     status: "active",
     is_deleted: false,
     user_id: user_id,
+    created_at: db.fn.now(),
+    updated_at: db.fn.now(),
   }));
 
-  await db("categories").insert(categoriesToInsert);
+  const inserted = await db("categories")
+    .insert(categoriesToInsert)
+    .returning(["id", "name", "description", "status"]);
+
+  return {
+    message: `Successfully created ${inserted.length} categor${
+      inserted.length > 1 ? "ies" : "y"
+    }`,
+    count: inserted.length,
+    data: inserted,
+  };
 };
 
 exports.getAllCategory = async (user_id, permissinRole) => {
