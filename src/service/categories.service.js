@@ -93,8 +93,10 @@ exports.getAllCategory = async (user_id, permissinRole) => {
     error.statusCode = 404;
     throw error;
   }
+
   const result = await db("categories")
     .where({ user_id, is_deleted: false })
+    .orderBy("created_at", "desc")
     .select("*");
 
   if (result.length === 0) {

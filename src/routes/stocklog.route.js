@@ -23,6 +23,16 @@ async function stockLogRoutes(fastify, option) {
     { preHandler: [verifyApiKey, JWTAuth] },
     stockLogController.addStock
   );
+  fastify.get(
+    "/stocklog/:id",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    stockLogController.getStockLogById
+  );
+  fastify.get(
+    "/stocklog/byprodid/:id",
+    { preHandler: [verifyApiKey, JWTAuth] },
+    stockLogController.getStockLogByProductId
+  );
 }
 
 module.exports = stockLogRoutes;

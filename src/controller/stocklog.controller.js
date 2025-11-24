@@ -40,3 +40,24 @@ exports.addStock = async (request, reply) => {
     data,
   ]);
 };
+
+exports.getStockLogById = async (request, reply) => {
+  const { user_id, role } = request.user;
+  const { id } = request.params;
+  await handleController(request, reply, stockLogService.getStockLogById, [
+    user_id,
+    role,
+    id,
+  ]);
+};
+
+exports.getStockLogByProductId = async (request, reply) => {
+  const { user_id, role } = request.user;
+  const { id } = request.params;
+  await handleController(
+    request,
+    reply,
+    stockLogService.getStockLogByProductId,
+    [user_id, role, id]
+  );
+};

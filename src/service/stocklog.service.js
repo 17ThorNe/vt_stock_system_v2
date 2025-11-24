@@ -276,3 +276,54 @@ exports.addStock = async (user_id, staff_id, role, addData) => {
     };
   });
 };
+
+exports.getStockLogById = async (user_id, role, log_id) => {
+  if (![permission.admin, permission.inventory].includes(role)) {
+    throw validateError("No permission", 403);
+  }
+
+  await userIdValidate(user_id);
+
+  const res = await db("stocklogs")
+    .where({
+      user_id,
+      id: log_id,
+    })
+    .first();
+
+  console.log("res", res);
+
+  if (!res) {
+    throw validateError("Stock log not found", 404);
+  }
+
+  return res;
+};
+
+exports.getStockLogByProductId = async (user_id, role, product_id) => {
+  if (![permission.admin, permission.inventory].includes(role)) {
+    throw validateError("No permission", 403);
+  }
+
+  await userIdValidate(user_id);
+
+  const checkProduct = await db("products")
+    .select("*")
+    .where({ user_id, id: product_id, is_deleted: false })
+    .first();
+
+  if (!checkProduct) {
+    throw validateError("Product not found!", 404);
+  }
+
+  const res = await db("stocklogs")
+    .select("*")
+    .where({ user_id, id: product_id })
+    .first();
+
+  if (!res) {
+    throw validateError("Stocklog not found!", 404);
+  }
+
+  return res;
+};
