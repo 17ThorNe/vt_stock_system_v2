@@ -11,38 +11,40 @@ exports.createOrder = async (user_id, orders, role) => {
 
   await userIdValidate(user_id);
 
-  const ordersToInsert = [];
+  // Since you send only ONE order → take first item
+  const order = orders[0]; // ← your frontend sends one object in array
 
-  for (const order of orders) {
-    const { customer_id, total_price, sale_person } = order;
+  const { customer_id, total_price, sale_person } = order;
 
-    const customer = await db("customers")
-      .where({ id: customer_id, is_deleted: 0 })
-      .first();
-    if (!customer) {
-      throw validateError(`Customer ID ${customer_id} not found`, 404);
-    }
-
-    const salePerson = await db("staff")
-      .where({ id: sale_person, permission_lvl: 3, status: "active" })
-      .first();
-    if (!salePerson) {
-      throw validateError(`Sale person ID ${sale_person} not found`, 404);
-    }
-
-    ordersToInsert.push({
-      user_id,
-      customer_id,
-      sale_person,
-      total_price: total_price || 0.0,
-      status: "pending",
-      is_deleted: 0,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+  const customer = await db("customers")
+    .where({ id: customer_id, is_deleted: 0 })
+    .first();
+  if (!customer) {
+    throw validateError(`Customer ID ${customer_id} not found`, 404);
   }
 
-  await db("orders").insert(ordersToInsert);
+  const salePerson = await db("staff")
+    .where({ id: sale_person, permission_lvl: 3, status: "active" })
+    .first();
+  if (!salePerson) {
+    throw validateError(`Sale person ID ${sale_person} not found`, 404);
+  }
+
+  const orderToInsert = {
+    user_id,
+    customer_id,
+    sale_person,
+    total_price: total_price || 0.0,
+    status: "pending",
+    is_deleted: 0,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  // Insert and return only the ID
+  const [orderId] = await db("orders").insert(orderToInsert).returning("id");
+
+  return orderId;
 };
 
 exports.getAllOrder = async (
