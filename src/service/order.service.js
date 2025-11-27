@@ -96,7 +96,6 @@ exports.getAllOrder = async (
 
   const orderIds = orders.map((o) => o.id);
 
-  // ---------- 5. Fetch order_items with product info ----------
   const items = await db("order_items AS oi")
     .leftJoin("products AS p", "oi.product_id", "p.id")
     .whereIn("oi.order_id", orderIds)
@@ -115,7 +114,6 @@ exports.getAllOrder = async (
       "p.status AS product_status"
     );
 
-  // ---------- 6. Merge items into orders ----------
   const data = orders.map((order) => ({
     ...order,
     items: items
@@ -137,7 +135,6 @@ exports.getAllOrder = async (
       })),
   }));
 
-  // ---------- 7. Return paginated result ----------
   return {
     data,
     pagination: {
@@ -150,7 +147,6 @@ exports.getAllOrder = async (
 };
 
 exports.getOrderById = async (user_id, sale_person, order_id, role) => {
-  // ---------- 1. Permission check ----------
   if (
     ![permission.admin, permission.inventory, permission.sale_person].includes(
       role
@@ -161,7 +157,6 @@ exports.getOrderById = async (user_id, sale_person, order_id, role) => {
 
   await userIdValidate(user_id);
 
-  // ---------- 2. Build base query ----------
   let query = db("orders AS o")
     .leftJoin("order_items AS oi", "oi.order_id", "o.id")
     .leftJoin("products AS p", "p.id", "oi.product_id")
