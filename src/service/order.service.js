@@ -84,6 +84,7 @@ exports.getAllOrder = async (
   const orders = await orderQuery
     .clone()
     .select("o.*", "s.fullname AS sale_name", "s.id AS staff_id")
+    .orderBy("o.created_at", "desc") // <-- add this line
     .limit(limit)
     .offset(offset);
 

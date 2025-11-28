@@ -55,7 +55,7 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
     sale_id: staff_id,
     product_id: x.product_id,
     quantity: x.quantity,
-    price: x.price,
+    price: x.sale_price ?? 0,
   }));
 
   return await db.transaction(async (trx) => {
@@ -64,11 +64,12 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
 
     // Auto Stock-out (for each item)
     for (const item of data) {
-      const { product_id, quantity, price } = item;
+      const { product_id, quantity, sale_price } = item;
 
+      // --- Get the product quantity and default_cost ---
       const product = await trx("products")
         .where({ user_id, id: product_id, is_deleted: false })
-        .select("quantity", "total_out")
+        .select("quantity", "default_cost")
         .first();
 
       if (!product) {
@@ -85,7 +86,8 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
         );
       }
 
-      // Update product quantity
+      const costPrice = product.default_cost ?? 0; // <-- this ensures correct cost
+
       await trx("products")
         .update({
           quantity: newQty,
@@ -93,7 +95,6 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
         })
         .where({ user_id, id: product_id });
 
-      // Insert stock log (auto stock-out)
       await trx("stocklogs").insert({
         user_id,
         staff_id,
@@ -102,8 +103,8 @@ exports.createItems = async (user_id, staff_id, order_id, role, data) => {
         order_id,
         stock_type: "out",
         quantity,
-        cost_price: 0,
-        sale_price: price,
+        cost_price: costPrice, // <-- use default_cost
+        sale_price: sale_price, // <-- from frontend
         p_stock: previousQty,
         n_stock: newQty,
         note: `Sold ${quantity} units`,

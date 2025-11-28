@@ -56,6 +56,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
 
   await userIdValidate(user_id);
 
+  // Validate staff
   let staffQuery = db("staff")
     .where({ user_id, permission_lvl: 2, status: "active" })
     .first();
@@ -65,9 +66,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
   }
 
   const staff = await staffQuery;
-  if (!staff) {
-    throw validateError("Invalid Staff ID", 404);
-  }
+  if (!staff) throw validateError("Invalid Staff ID", 404);
 
   const productIds = [...new Set(dataArray.map((x) => x.product_id))];
   const supplierIds = [...new Set(dataArray.map((x) => x.supplier_id))];
@@ -113,15 +112,37 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       order_id = null,
     } = data;
 
-    const previousQty = productMap[product_id];
+    let previousQty = productMap[product_id];
     let newQty = previousQty;
+
+    // ⚠️ FIX: Auto fetch cost_price for OUT stock
+    let finalCostPrice = cost_price;
+
+    if (stock_type === "out") {
+      const lastIn = await db("stocklogs")
+        .where({ user_id, product_id, stock_type: "in" })
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (!lastIn) {
+        throw validateError(
+          `Cannot OUT product ${product_id} — No IN stock history found`,
+          400
+        );
+      }
+
+      finalCostPrice = lastIn.cost_price; // override with real cost
+    }
 
     if (stock_type === "in") newQty += quantity;
     else if (stock_type === "out") {
       newQty -= quantity;
       if (newQty < 0) throw validateError("Insufficient stock", 400);
-    } else throw validateError("Invalid stock_type", 400);
+    } else {
+      throw validateError("Invalid stock_type", 400);
+    }
 
+    // Prepare log
     logsToInsert.push({
       user_id,
       staff_id,
@@ -130,7 +151,7 @@ exports.importStock = async (user_id, staff_id, role, dataArray) => {
       order_id,
       stock_type,
       quantity,
-      cost_price: cost_price ?? 0,
+      cost_price: finalCostPrice ?? 0,
       sale_price: sale_price ?? 0,
       p_stock: previousQty,
       n_stock: newQty,
